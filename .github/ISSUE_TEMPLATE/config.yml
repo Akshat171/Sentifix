@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💡 Idea / feature discussion
+    url: https://github.com/Akshat171/sentifix/discussions/new?category=ideas
+    about: For feature ideas and open-ended discussions, use GitHub Discussions instead of an issue.
+  - name: ❓ Usage question
+    url: https://github.com/Akshat171/sentifix/discussions/new?category=q-a
+    about: Questions about setup, configuration, or usage.

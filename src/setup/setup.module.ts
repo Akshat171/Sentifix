@@ -1,0 +1,10 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Installation } from '../persistence/entities/installation.entity';
+import { SetupController } from './setup.controller';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([Installation])],
+  controllers: [SetupController],
+})
+export class SetupModule {}

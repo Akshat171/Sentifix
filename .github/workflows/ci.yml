@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: sentifix
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: sentifix
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      rabbitmq:
+        image: rabbitmq:3-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql://sentifix:secret@localhost:5433/sentifix
+        run: pnpm typeorm migration:run -d src/persistence/data-source.ts
+
+      - name: E2E tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://sentifix:secret@localhost:5433/sentifix
+          REDIS_URL: redis://localhost:6379
+          RABBITMQ_URL: amqp://guest:guest@localhost:5672
+          OPENAI_API_KEY: sk-test-placeholder-not-used-in-health-check
+          OPENAI_CHAT_MODEL: gpt-4o-mini
+          OPENAI_EMBEDDING_MODEL: text-embedding-3-small
+          GITHUB_WEBHOOK_SECRET: ci-test-secret
+        run: pnpm test:e2e
