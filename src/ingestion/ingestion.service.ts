@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GithubService } from '../github/github.service';
@@ -34,6 +35,16 @@ export interface GithubPushPayload {
   };
 }
 
+export interface GithubIssueCommentPayload {
+  action: string;
+  comment: {
+    body: string;
+    user: { login: string; type: string };
+  };
+  issue: GithubIssuePayload['issue'];
+  repository: GithubIssuePayload['repository'];
+}
+
 export interface GithubInstallationPayload {
   action: 'created' | 'deleted' | 'suspend' | 'unsuspend';
   installation: {
@@ -53,6 +64,7 @@ export interface GithubInstallationReposPayload {
 @Injectable()
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
+  private readonly trigger: string;
 
   constructor(
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
@@ -60,7 +72,10 @@ export class IngestionService {
     private readonly producer: QueueProducer,
     private readonly github: GithubService,
     private readonly indexingJob: IndexingJob,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.trigger = config.get<string>('SENTIFIX_TRIGGER') ?? 'all';
+  }
 
   async handleIssueEvent(payload: GithubIssuePayload): Promise<void> {
     const { action, issue, repository } = payload;
@@ -70,10 +85,49 @@ export class IngestionService {
       return;
     }
 
+    const labels = issue.labels.map((l) => l.name);
+    if (!this.shouldTriageOnOpen(labels)) {
+      this.logger.log(
+        `Skipping issue #${issue.number} in ${repository.full_name} — trigger "${this.trigger}" not satisfied`,
+      );
+      return;
+    }
+
     this.logger.log(
       `Processing ${action} event for issue #${issue.number} in ${repository.full_name}`,
     );
+    await this.enqueueIssueForTriage(repository, issue);
+  }
 
+  async handleIssueCommentEvent(payload: GithubIssueCommentPayload): Promise<void> {
+    const { action, comment, issue, repository } = payload;
+    if (action !== 'created') return;
+    // Ignore bot comments so Sentifix can never trigger itself
+    if (comment.user?.type === 'Bot') return;
+    // Only act on an explicit "/sentifix" command (word-bounded)
+    if (!/(^|\s)\/sentifix(\s|$)/i.test(comment.body ?? '')) return;
+
+    this.logger.log(
+      `/sentifix on issue #${issue.number} in ${repository.full_name} — triggering triage`,
+    );
+    await this.enqueueIssueForTriage(repository, issue);
+  }
+
+  /** Whether to auto-triage a freshly opened/reopened issue given the configured trigger. */
+  private shouldTriageOnOpen(labels: string[]): boolean {
+    if (this.trigger === 'command') return false; // only "/sentifix" triggers
+    if (this.trigger.startsWith('label:')) {
+      const required = this.trigger.slice('label:'.length).trim().toLowerCase();
+      return labels.some((l) => l.toLowerCase() === required);
+    }
+    return true; // 'all'
+  }
+
+  /** Persist the issue, post a placeholder comment, and enqueue a triage job. */
+  private async enqueueIssueForTriage(
+    repository: GithubIssuePayload['repository'],
+    issue: GithubIssuePayload['issue'],
+  ): Promise<void> {
     const existing = await this.issueRepo.findOne({
       where: { githubRepoId: String(repository.id), githubIssueNumber: issue.number },
     });

@@ -16,6 +16,7 @@ import * as crypto from 'crypto';
 import {
   GithubInstallationPayload,
   GithubInstallationReposPayload,
+  GithubIssueCommentPayload,
   GithubIssuePayload,
   GithubPushPayload,
   IngestionService,
@@ -39,7 +40,7 @@ export class IngestionController {
   async handleGithubWebhook(
     @Headers('x-github-event') event: string,
     @Headers('x-hub-signature-256') signature: string,
-    @Body() payload: GithubIssuePayload & GithubPushPayload & GithubInstallationPayload & GithubInstallationReposPayload,
+    @Body() payload: GithubIssuePayload & GithubPushPayload & GithubInstallationPayload & GithubInstallationReposPayload & GithubIssueCommentPayload,
     @Req() req: RawBodyRequest<{ rawBody?: Buffer }>,
   ): Promise<{ received: boolean }> {
     const rawBody = req.rawBody;
@@ -52,6 +53,8 @@ export class IngestionController {
 
     if (event === 'issues') {
       fire(this.ingestion.handleIssueEvent(payload), 'Issue event');
+    } else if (event === 'issue_comment') {
+      fire(this.ingestion.handleIssueCommentEvent(payload), 'Issue comment event');
     } else if (event === 'push') {
       fire(this.ingestion.handlePushEvent(payload), 'Push event');
     } else if (event === 'installation') {

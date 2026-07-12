@@ -14,6 +14,14 @@ export const configSchema = Joi.object({
   OPENAI_EMBEDDING_MODEL: Joi.string().default('text-embedding-3-small'),
   GITHUB_WEBHOOK_SECRET: Joi.string().required(),
   GITHUB_TOKEN: Joi.string().optional(),
+  // Which issues to auto-triage:
+  //   all            → every opened/reopened issue (default)
+  //   label:<name>   → only issues carrying that label (e.g. label:bug)
+  //   command        → none automatically; only when someone comments "/sentifix"
+  // The "/sentifix" comment always triggers a (re)triage regardless of this setting.
+  SENTIFIX_TRIGGER: Joi.string()
+    .pattern(/^(all|command|label:.+)$/)
+    .default('all'),
   API_KEY: Joi.string().optional(),
   // GitHub App (optional — enables one-click install flow)
   GITHUB_APP_ID: Joi.number().optional(),
