@@ -119,6 +119,69 @@ Create a test issue on a connected repo. Within ~30s the app posts a triage comm
 
 ---
 
-## Self-hosting with Docker Compose
+## Option C — Your own server (AWS EC2 / VPS) 🖥️
 
-For a local or VPS deployment without a managed platform, the repo's [`docker-compose.yml`](./docker-compose.yml) runs Postgres + Redis + RabbitMQ. Run the app alongside it with `NODE_ENV=production` and `DB_SYNCHRONIZE=true`. See the [README](./README.md#-quickstart) for the local quickstart.
+The repo ships [`docker-compose.prod.yml`](./docker-compose.prod.yml), which runs the **entire stack on one box** — the app plus Postgres/pgvector, Redis, and RabbitMQ. Only the app is exposed to the internet (port 80); the datastores stay private on the internal Docker network.
+
+### 1. Open the port (AWS Security Group)
+
+In the EC2 console → your instance → **Security → Security groups → Edit inbound rules**, add:
+
+| Type | Port | Source |
+|---|---|---|
+| HTTP | 80 | `0.0.0.0/0` (anywhere — GitHub's webhook servers must reach it) |
+| SSH | 22 | your IP only |
+
+### 2. Install Docker (if not already)
+
+```bash
+sudo apt update && sudo apt install -y docker.io docker-compose-plugin
+sudo usermod -aG docker $USER && newgrp docker   # run docker without sudo
+```
+
+### 3. Clone, configure, launch
+
+```bash
+git clone https://github.com/Akshat171/Sentifix.git && cd Sentifix
+cp .env.prod.example .env.prod
+nano .env.prod          # set OPENAI_API_KEY and GITHUB_WEBHOOK_SECRET (openssl rand -hex 32)
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+First build takes a few minutes. Check it's healthy:
+
+```bash
+docker compose -f docker-compose.prod.yml ps          # all services "healthy"
+curl http://localhost/health                          # {"status":"ok"}
+docker compose -f docker-compose.prod.yml logs -f app # tail app logs
+```
+
+### 4. Your webhook URL
+
+```
+http://<EC2_PUBLIC_IP>/webhooks/github
+```
+
+Use this as the **Payload URL** in your GitHub webhook (or GitHub App), with your `GITHUB_WEBHOOK_SECRET`, then index a repo and open an issue — see [After deploy](#after-deploy--connect-a-repo) below.
+
+> **On HTTP vs HTTPS:** GitHub accepts `http://` webhook URLs (it shows a warning but delivers). This is fine to start. When you're ready for HTTPS, point a domain at the instance and add a Caddy or nginx reverse proxy in front of the app for automatic TLS — ask and we'll wire it up.
+
+### Updating to a new version
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### Managing the stack
+
+```bash
+docker compose -f docker-compose.prod.yml down     # stop (data persists in volumes)
+docker compose -f docker-compose.prod.yml down -v  # stop AND wipe all data
+```
+
+---
+
+## Self-hosting locally
+
+For local development, the repo's [`docker-compose.yml`](./docker-compose.yml) runs just the infra (Postgres + Redis + RabbitMQ) while you run the app with `pnpm start:dev`. See the [README](./README.md#-quickstart).

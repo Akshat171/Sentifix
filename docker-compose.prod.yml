@@ -1,0 +1,76 @@
+# Sentifix — production stack for a single server (AWS EC2, VPS, etc.)
+#
+# Runs the app + Postgres/pgvector + Redis + RabbitMQ on one box.
+# Only the app is exposed to the internet (port 80). The datastores stay
+# private on the internal Docker network — never published to the host.
+#
+# Usage on your EC2 instance:
+#   git clone https://github.com/Akshat171/Sentifix.git && cd Sentifix
+#   cp .env.prod.example .env.prod   # then edit: OPENAI_API_KEY + GITHUB_WEBHOOK_SECRET
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Your webhook URL is then:  http://<EC2_PUBLIC_IP>/webhooks/github
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sentifix-app
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - '80:3000' # public → GitHub/Slack webhooks hit http://<EC2_IP>/webhooks/...
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sentifix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sentifix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: sentifix
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sentifix -d sentifix']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No host port published — reachable only as "postgres" on the internal network
+
+  redis:
+    image: redis:7-alpine
+    container_name: sentifix-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: sentifix-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
