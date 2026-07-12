@@ -166,6 +166,20 @@ Use this as the **Payload URL** in your GitHub webhook (or GitHub App), with you
 
 > **On HTTP vs HTTPS:** GitHub accepts `http://` webhook URLs (it shows a warning but delivers). This is fine to start. When you're ready for HTTPS, point a domain at the instance and add a Caddy or nginx reverse proxy in front of the app for automatic TLS — ask and we'll wire it up.
 
+### Running alongside other apps on the same box
+
+Sentifix is fully isolated as its own Docker Compose project, so it will never touch other containers. Two things to set when the box already runs something:
+
+1. **Pick a free host port.** If port 80 is taken (e.g. by another app's nginx), set `SENTIFIX_APP_PORT` in `.env.prod` to a free port and run with `--env-file`:
+   ```bash
+   echo 'SENTIFIX_APP_PORT=8080' >> .env.prod
+   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+   ```
+   Webhook URL becomes `http://<IP>:8080/webhooks/github` (open that port in the Security Group).
+2. **Only ever use scoped commands** — `docker compose -f docker-compose.prod.yml <cmd>`. These act on Sentifix's 4 services only. Never run global commands like `docker system prune -a` or `docker stop $(docker ps -q)`, which would hit every container on the host.
+
+Sentifix's datastores (Postgres/Redis/RabbitMQ) are never published to the host — they live only on Sentifix's private network — so they can't collide with other services' ports.
+
 ### Updating to a new version
 
 ```bash
