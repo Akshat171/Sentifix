@@ -13,11 +13,16 @@
 
   <p>
     <a href="#-quickstart">Quickstart</a> ·
+    <a href="#-one-click-deploy">Deploy</a> ·
     <a href="#-how-it-works">How it works</a> ·
     <a href="#-integrations">Integrations</a> ·
     <a href="#%EF%B8%8F-configuration">Configuration</a> ·
     <a href="#-roadmap">Roadmap</a> ·
     <a href="./CONTRIBUTING.md">Contributing</a>
+  </p>
+
+  <p>
+    <a href="https://render.com/deploy?repo=https://github.com/Akshat171/sentifix"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render"></a>
   </p>
 </div>
 
@@ -182,6 +187,20 @@ curl -X POST http://localhost:3000/index \
 Create a GitHub issue → Sentifix triages it and posts a comment with the fix.
 
 > **Tip:** Install the [GitHub App](#github-app) to skip manual webhook setup and enable auto-indexing.
+
+---
+
+## 🚀 One-click deploy
+
+Don't want to run infra yourself? Deploy the whole stack — app, PostgreSQL + pgvector, Redis, and RabbitMQ — to the cloud in one click. You get a real public HTTPS URL, so **no `ngrok` and no always-on laptop needed**.
+
+<a href="https://render.com/deploy?repo=https://github.com/Akshat171/sentifix"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render"></a>
+
+1. Click the button (or use the [`render.yaml`](./render.yaml) blueprint).
+2. Fill in your `OPENAI_API_KEY` — everything else is auto-wired or optional.
+3. Open `https://<your-app>.onrender.com/setup` and connect a repo.
+
+Full walkthrough (Render + Railway + self-hosting), costs, and troubleshooting: **[DEPLOY.md](./DEPLOY.md)**.
 
 ---
 

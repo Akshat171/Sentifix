@@ -9,15 +9,22 @@ import { Run } from './entities/run.entity';
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
-        entities: [Issue, Run, EvalResult, Installation],
-        synchronize: config.get<string>('NODE_ENV') !== 'production',
-        migrations: ['dist/persistence/migrations/*.js'],
-        migrationsRun: false,
-        logging: ['error', 'warn'],
-      }),
+      useFactory: (config: ConfigService) => {
+        const isProd = config.get<string>('NODE_ENV') === 'production';
+        return {
+          type: 'postgres',
+          url: config.get<string>('DATABASE_URL'),
+          entities: [Issue, Run, EvalResult, Installation],
+          // Entity tables have no migrations — synchronize creates them.
+          // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).
+          synchronize: !isProd || config.get<boolean>('DB_SYNCHRONIZE') === true,
+          migrations: ['dist/persistence/migrations/*.js'],
+          // Migrations own the pgvector extension + code_chunks table (no entity for it).
+          // Run them automatically in prod so a fresh deploy comes up with a working RAG store.
+          migrationsRun: isProd,
+          logging: ['error', 'warn'],
+        };
+      },
       inject: [ConfigService],
     }),
   ],

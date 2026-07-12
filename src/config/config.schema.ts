@@ -4,6 +4,9 @@ export const configSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
   DATABASE_URL: Joi.string().uri().required(),
+  // Create entity tables via TypeORM synchronize in production (used by the deploy template,
+  // since entity tables have no migrations). Safe here — all tables hold re-derivable data.
+  DB_SYNCHRONIZE: Joi.boolean().default(false),
   REDIS_URL: Joi.string().uri().optional(),
   RABBITMQ_URL: Joi.string().uri().required(),
   OPENAI_API_KEY: Joi.string().required(),

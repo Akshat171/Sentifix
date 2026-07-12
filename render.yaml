@@ -1,0 +1,118 @@
+# Sentifix — one-click deploy blueprint for Render (https://render.com)
+#
+# Provisions the entire stack:
+#   • sentifix           — the app (NestJS + Fastify + RabbitMQ consumer), built from Dockerfile
+#   • sentifix-db        — PostgreSQL 16 with pgvector (managed)
+#   • sentifix-redis     — Redis / Key Value (managed)
+#   • sentifix-rabbitmq  — RabbitMQ (private service, internal network only)
+#
+# Deploy: push this repo to GitHub → https://dashboard.render.com/blueprints → New Blueprint
+# → pick the repo. Render reads this file and stands everything up. You only fill in the
+# secrets marked `sync: false` (at minimum OPENAI_API_KEY). See DEPLOY.md for the full guide.
+#
+# NOTE: all services share one region so the private network works — keep them identical.
+
+databases:
+  - name: sentifix-db
+    plan: free                 # upgrade for more storage / connections
+    region: oregon
+    postgresMajorVersion: "16" # pgvector is available; the app enables the extension on boot
+
+services:
+  # ── Redis (Key Value) — cache ────────────────────────────────────────────────
+  - type: redis
+    name: sentifix-redis
+    plan: free
+    region: oregon
+    ipAllowList: []            # empty = reachable only from within your Render private network
+    maxmemoryPolicy: noeviction
+
+  # ── RabbitMQ — job queue (private service, not exposed to the internet) ───────
+  # Private services are not on the free tier — this needs at least a Starter instance.
+  - type: pserv
+    name: sentifix-rabbitmq
+    runtime: image
+    image:
+      url: rabbitmq:3-management-alpine
+    plan: starter
+    region: oregon
+    disk:
+      name: rabbitmq-data
+      mountPath: /var/lib/rabbitmq
+      sizeGB: 1
+    envVars:
+      # Internal-only credentials. Reachable only on the private network; rotate for production.
+      - key: RABBITMQ_DEFAULT_USER
+        value: sentifix
+      - key: RABBITMQ_DEFAULT_PASS
+        value: sentifix
+
+  # ── Sentifix app ─────────────────────────────────────────────────────────────
+  # Starter (not free) so the RabbitMQ queue consumer stays alive instead of spinning down.
+  - type: web
+    name: sentifix
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      # Create entity tables automatically on first boot (see persistence.module.ts)
+      - key: DB_SYNCHRONIZE
+        value: "true"
+
+      # ── Infra wiring (auto-filled by Render from the services above) ──────────
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sentifix-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: sentifix-redis
+          property: connectionString
+      - key: RABBITMQ_URL
+        value: amqp://sentifix:sentifix@sentifix-rabbitmq:5672
+
+      # ── OpenAI (REQUIRED — fill this in) ──────────────────────────────────────
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_CHAT_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_EMBEDDING_MODEL
+        value: text-embedding-3-small
+
+      # ── GitHub (webhook secret auto-generated; token optional) ────────────────
+      - key: GITHUB_WEBHOOK_SECRET
+        generateValue: true      # Render generates a strong secret; copy it into your webhook
+      - key: GITHUB_TOKEN
+        sync: false              # optional — for private repos / higher rate limits
+
+      # ── GitHub App (optional — enables one-click install; fill after creating the app) ──
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_SLUG
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_APP_CLIENT_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_SECRET
+        sync: false
+
+      # ── Slack (optional) ──────────────────────────────────────────────────────
+      - key: SLACK_BOT_TOKEN
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: SLACK_DEFAULT_REPO
+        sync: false
+
+      # ── API auth (optional — set to require X-Api-Key on /triage and /index) ──
+      - key: API_KEY
+        sync: false
