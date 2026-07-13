@@ -42,6 +42,11 @@ fi
 echo "→ Clearing dangling build layers..."
 docker image prune -f >/dev/null 2>&1 || true
 
+# Reclaim unused build cache (regenerable; only removes cache no build references).
+# Keeps storage minimal across repeated deploys. Safe for other apps on the host.
+echo "→ Trimming unused build cache..."
+docker builder prune -f >/dev/null 2>&1 || true
+
 echo
 echo "→ Sentifix status:"
 $COMPOSE ps
