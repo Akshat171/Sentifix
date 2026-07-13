@@ -1,15 +1,22 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { AgentPipeline } from '../agent/agent.pipeline';
 import { EvalJudge } from '../eval/eval.judge';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
 import { EvalResult } from '../persistence/entities/eval-result.entity';
+import { InstallationRepository } from '../persistence/entities/installation-repository.entity';
 import { Issue } from '../persistence/entities/issue.entity';
 import { Run } from '../persistence/entities/run.entity';
 import { TriageJobPayload } from '../queue/queue.producer';
 import { DataSource } from 'typeorm';
+
+/**
+ * Tenant scope for read/act operations. `undefined` = unrestricted (self-host or
+ * operator). An array of installation IDs restricts data to those installations' repos.
+ */
+export type TenantScope = number[] | undefined;
 
 @Injectable()
 export class TriageService {
@@ -19,6 +26,8 @@ export class TriageService {
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
     @InjectRepository(Run) private readonly runRepo: Repository<Run>,
     @InjectRepository(EvalResult) private readonly evalRepo: Repository<EvalResult>,
+    @InjectRepository(InstallationRepository)
+    private readonly installRepoMap: Repository<InstallationRepository>,
     private readonly pipeline: AgentPipeline,
     private readonly judge: EvalJudge,
     private readonly github: GithubService,
@@ -138,10 +147,11 @@ export class TriageService {
     this.logger.log(`Auto-indexing complete for ${repoFullName}`);
   }
 
-  async retriageIssue(issueId: string): Promise<{ runId: string }> {
+  async retriageIssue(issueId: string, scope?: TenantScope): Promise<{ runId: string }> {
     const issue = await this.issueRepo.findOne({ where: { id: issueId } });
     if (!issue) throw new NotFoundException(`Issue ${issueId} not found`);
     if (!issue.repoFullName) throw new NotFoundException('repoFullName not set on issue');
+    await this.assertRepoInScope(issue.repoFullName, scope);
 
     const run = await this.runRepo.save(
       this.runRepo.create({ issue, status: 'pending', repoFullName: issue.repoFullName }),
@@ -161,19 +171,22 @@ export class TriageService {
     return { runId: run.id };
   }
 
-  async getAllIssues(): Promise<Issue[]> {
+  async getAllIssues(scope?: TenantScope): Promise<Issue[]> {
+    const where = await this.scopeWhere(scope);
     return this.issueRepo.find({
+      ...(where ? { where } : {}),
       order: { createdAt: 'DESC' },
       relations: ['runs', 'runs.evalResults'],
     });
   }
 
-  async getRunById(runId: string): Promise<Run> {
+  async getRunById(runId: string, scope?: TenantScope): Promise<Run> {
     const run = await this.runRepo.findOne({
       where: { id: runId },
       relations: ['issue', 'evalResults'],
     });
     if (!run) throw new NotFoundException(`Run ${runId} not found`);
+    await this.assertRepoInScope(run.repoFullName ?? run.issue?.repoFullName ?? '', scope);
     return run;
   }
 
@@ -183,5 +196,28 @@ export class TriageService {
       order: { startedAt: 'DESC' },
       relations: ['evalResults'],
     });
+  }
+
+  /** Repo full-names visible to the given tenant scope. */
+  private async reposForScope(scope: number[]): Promise<string[]> {
+    if (!scope.length) return [];
+    const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
+    return rows.map((r) => r.repoFullName);
+  }
+
+  private async scopeWhere(scope?: TenantScope): Promise<FindOptionsWhere<Issue> | undefined> {
+    if (scope === undefined) return undefined; // unrestricted
+    const repos = await this.reposForScope(scope);
+    // No accessible repos → match nothing (never fall back to "all")
+    return { repoFullName: In(repos.length ? repos : [' none']) };
+  }
+
+  /** Throw unless the repo is visible to the scope (no-op when unrestricted). */
+  async assertRepoInScope(repoFullName: string, scope?: TenantScope): Promise<void> {
+    if (scope === undefined) return;
+    const repos = await this.reposForScope(scope);
+    if (!repos.includes(repoFullName)) {
+      throw new ForbiddenException('Repository not in your installations');
+    }
   }
 }

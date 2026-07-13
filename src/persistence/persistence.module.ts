@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { EvalResult } from './entities/eval-result.entity';
 import { Installation } from './entities/installation.entity';
+import { InstallationRepository } from './entities/installation-repository.entity';
 import { Issue } from './entities/issue.entity';
 import { Run } from './entities/run.entity';
 
@@ -14,7 +15,7 @@ import { Run } from './entities/run.entity';
         return {
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [Issue, Run, EvalResult, Installation],
+          entities: [Issue, Run, EvalResult, Installation, InstallationRepository],
           // Entity tables have no migrations — synchronize creates them.
           // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).
           synchronize: !isProd || config.get<boolean>('DB_SYNCHRONIZE') === true,

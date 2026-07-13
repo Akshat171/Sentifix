@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
 import { Installation } from '../persistence/entities/installation.entity';
+import { InstallationRepository } from '../persistence/entities/installation-repository.entity';
 import { Issue } from '../persistence/entities/issue.entity';
 import { QueueProducer } from '../queue/queue.producer';
 
@@ -69,6 +70,8 @@ export class IngestionService {
   constructor(
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
     @InjectRepository(Installation) private readonly installationRepo: Repository<Installation>,
+    @InjectRepository(InstallationRepository)
+    private readonly installRepoMap: Repository<InstallationRepository>,
     private readonly producer: QueueProducer,
     private readonly github: GithubService,
     private readonly indexingJob: IndexingJob,
@@ -194,6 +197,7 @@ export class IngestionService {
         repos,
       });
       await this.installationRepo.save(record);
+      await this.mapRepos(installation.id, repos);
       this.logger.log(
         `App installed by ${installation.account.login} on repos: ${repos.join(', ')}`,
       );
@@ -206,6 +210,7 @@ export class IngestionService {
       }
     } else if (action === 'deleted') {
       await this.installationRepo.delete({ installationId: installation.id });
+      await this.installRepoMap.delete({ installationId: installation.id });
       this.logger.log(`App uninstalled by ${installation.account.login}`);
     }
   }
@@ -220,6 +225,7 @@ export class IngestionService {
       const newRepos = payload.repositories_added.map((r) => r.full_name);
       installationRecord.repos = [...(installationRecord.repos ?? []), ...newRepos];
       await this.installationRepo.save(installationRecord);
+      await this.mapRepos(payload.installation.id, newRepos);
       this.logger.log(`Repos added to installation: ${newRepos.join(', ')}`);
 
       for (const repo of newRepos) {
@@ -228,10 +234,22 @@ export class IngestionService {
         });
       }
     } else if (payload.action === 'removed' && payload.repositories_removed?.length) {
-      const removed = new Set(payload.repositories_removed.map((r) => r.full_name));
-      installationRecord.repos = (installationRecord.repos ?? []).filter((r) => !removed.has(r));
+      const removed = payload.repositories_removed.map((r) => r.full_name);
+      installationRecord.repos = (installationRecord.repos ?? []).filter(
+        (r) => !removed.includes(r),
+      );
       await this.installationRepo.save(installationRecord);
-      this.logger.log(`Repos removed from installation: ${[...removed].join(', ')}`);
+      if (removed.length) await this.installRepoMap.delete({ repoFullName: In(removed) });
+      this.logger.log(`Repos removed from installation: ${removed.join(', ')}`);
     }
+  }
+
+  /** Upsert exact repo→installation rows (unique on repoFullName). */
+  private async mapRepos(installationId: number, repos: string[]): Promise<void> {
+    if (!repos.length) return;
+    await this.installRepoMap.upsert(
+      repos.map((repoFullName) => ({ installationId, repoFullName })),
+      ['repoFullName'],
+    );
   }
 }

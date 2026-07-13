@@ -1,18 +1,31 @@
-import { Controller, Get, Header } from '@nestjs/common';
-
-const SEVERITY_COLOR: Record<string, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  low: '#22c55e',
-};
+import { Controller, Get, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { HttpReply, HttpRequest } from '../auth/http.types';
+import { SessionService } from '../auth/session.service';
 
 @Controller('dashboard')
 export class DashboardController {
+  private readonly authEnabled: boolean;
+
+  constructor(
+    config: ConfigService,
+    private readonly session: SessionService,
+  ) {
+    this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
+  }
+
   @Get()
-  @Header('Content-Type', 'text/html; charset=utf-8')
-  serve(): string {
-    return `<!DOCTYPE html>
+  serve(@Req() req: HttpRequest, @Res() reply: HttpReply): void {
+    let userBadge = '';
+    if (this.authEnabled) {
+      const sess = this.session.getSession(req);
+      if (!sess) {
+        reply.redirect('/auth/login');
+        return;
+      }
+      userBadge = `<span style="margin-left:auto;font-size:12px;color:#8b949e">${sess.login} · <a href="/auth/logout" style="color:#58a6ff">Logout</a></span>`;
+    }
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -85,6 +98,7 @@ export class DashboardController {
     <svg width="20" height="20" viewBox="0 0 16 16" fill="#58a6ff"><path d="M8 0a8 8 0 100 16A8 8 0 008 0zm3.5 7.5h-3v-3a.5.5 0 00-1 0v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1z"/></svg>
     <h1>Sentifix</h1>
     <span>AI Bug Triage</span>
+    ${userBadge}
     <button class="refresh-btn" onclick="loadIssues()">↻ Refresh</button>
   </header>
   <div class="layout">
@@ -288,5 +302,7 @@ setInterval(loadIssues, 30000);
 </script>
 </body>
 </html>`;
+
+    reply.type('text/html; charset=utf-8').send(html);
   }
 }

@@ -23,6 +23,12 @@ export const configSchema = Joi.object({
     .pattern(/^(all|command|label:.+)$/)
     .default('all'),
   API_KEY: Joi.string().optional(),
+  // Multi-tenant SaaS mode: require GitHub login and scope the dashboard/API to the
+  // signed-in user's installations. Off (default) = open single-tenant self-host.
+  // When on, needs SESSION_SECRET, APP_BASE_URL, and GITHUB_APP_CLIENT_ID/SECRET.
+  DASHBOARD_AUTH: Joi.boolean().default(false),
+  SESSION_SECRET: Joi.string().optional(),   // HMAC secret for signing the session cookie
+  APP_BASE_URL: Joi.string().uri().optional(), // public base URL, e.g. https://api.sentifix.online
   // GitHub App (optional — enables one-click install flow)
   GITHUB_APP_ID: Joi.number().optional(),
   GITHUB_APP_PRIVATE_KEY: Joi.string().optional(), // PEM with \n escaped as \\n

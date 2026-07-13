@@ -1,31 +1,54 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import type { HttpReply, HttpRequest } from '../auth/http.types';
+import { In, Repository } from 'typeorm';
+import { SessionService } from '../auth/session.service';
 import { Installation } from '../persistence/entities/installation.entity';
 
 @Controller('setup')
 export class SetupController {
   private readonly appSlug: string;
+  private readonly authEnabled: boolean;
 
   constructor(
     config: ConfigService,
+    private readonly session: SessionService,
     @InjectRepository(Installation) private readonly installationRepo: Repository<Installation>,
   ) {
     this.appSlug = config.get<string>('GITHUB_APP_SLUG') ?? '';
+    this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
   }
 
   @Get()
-  @Header('Content-Type', 'text/html; charset=utf-8')
-  async serve(): Promise<string> {
-    const installations = await this.installationRepo.find({ order: { createdAt: 'DESC' } });
+  async serve(@Req() req: HttpRequest, @Res() reply: HttpReply): Promise<void> {
+    // In multi-tenant mode, require login and show only the user's installations
+    let installations: Installation[];
+    if (this.authEnabled) {
+      const sess = this.session.getSession(req);
+      if (!sess) {
+        reply.redirect('/auth/login');
+        return;
+      }
+      installations = sess.superuser
+        ? await this.installationRepo.find({ order: { createdAt: 'DESC' } })
+        : sess.installationIds.length
+          ? await this.installationRepo.find({
+              where: { installationId: In(sess.installationIds) },
+              order: { createdAt: 'DESC' },
+            })
+          : [];
+    } else {
+      installations = await this.installationRepo.find({ order: { createdAt: 'DESC' } });
+    }
+
     const installUrl = this.appSlug
       ? `https://github.com/apps/${this.appSlug}/installations/new`
       : null;
 
     const repoList = installations.flatMap((i) => i.repos ?? []);
 
-    return `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -103,5 +126,7 @@ export class SetupController {
   </div>
 </body>
 </html>`;
+
+    reply.type('text/html; charset=utf-8').send(html);
   }
 }

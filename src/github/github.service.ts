@@ -68,10 +68,10 @@ export class GithubService {
 
     try {
       const rows: Array<{ installation_id: number }> = await this.dataSource.query(
-        `SELECT installation_id FROM installations
-         WHERE repos LIKE $1
+        `SELECT installation_id FROM installation_repositories
+         WHERE repo_full_name = $1
          LIMIT 1`,
-        [`%${repoFullName}%`],
+        [repoFullName],
       );
 
       if (rows.length && rows[0].installation_id) {
