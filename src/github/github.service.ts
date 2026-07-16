@@ -67,17 +67,17 @@ export class GithubService {
     if (!this.appAuth || !repoFullName) return this.patOctokit;
 
     try {
-      const rows: Array<{ installation_id: number }> = await this.dataSource.query(
-        `SELECT installation_id FROM installation_repositories
-         WHERE repo_full_name = $1
+      const rows: Array<{ installationId: number }> = await this.dataSource.query(
+        `SELECT "installationId" FROM installation_repositories
+         WHERE "repoFullName" = $1
          LIMIT 1`,
         [repoFullName],
       );
 
-      if (rows.length && rows[0].installation_id) {
+      if (rows.length && rows[0].installationId) {
         const { token } = (await this.appAuth({
           type: 'installation',
-          installationId: rows[0].installation_id,
+          installationId: rows[0].installationId,
         })) as { token: string };
         return new Octokit({ auth: token });
       }
