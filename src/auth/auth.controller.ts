@@ -24,7 +24,7 @@ export class AuthController {
   login(@Res() reply: HttpReply): void {
     const state = crypto.randomBytes(16).toString('hex');
     reply.header('Set-Cookie', this.session.stateCookieHeader(state));
-    reply.redirect(this.oauth.authorizeUrl(state));
+    reply.code(302).redirect(this.oauth.authorizeUrl(state));
   }
 
   @Get('callback')
@@ -36,19 +36,19 @@ export class AuthController {
   ): Promise<void> {
     const expected = this.session.readCookie(req, 'sentifix_oauth_state');
     if (!code || !state || state !== expected) {
-      reply.redirect('/dashboard?error=oauth_state');
+      reply.code(302).redirect('/dashboard?error=oauth_state');
       return;
     }
 
     const token = await this.oauth.exchangeCode(code);
     if (!token) {
-      reply.redirect('/dashboard?error=oauth_token');
+      reply.code(302).redirect('/dashboard?error=oauth_token');
       return;
     }
 
     const login = await this.oauth.getLogin(token);
     if (!login) {
-      reply.redirect('/dashboard?error=oauth_user');
+      reply.code(302).redirect('/dashboard?error=oauth_user');
       return;
     }
     const installationIds = await this.oauth.getInstallationIds(token);
@@ -61,12 +61,12 @@ export class AuthController {
     reply.header('Set-Cookie', this.session.setCookieHeader(value, SESSION_TTL_SEC, this.secure));
     reply.header('Set-Cookie', 'sentifix_oauth_state=; Path=/; Max-Age=0');
     this.logger.log(`Login: ${login} (${installationIds.length} installation(s))`);
-    reply.redirect('/dashboard');
+    reply.code(302).redirect('/dashboard');
   }
 
   @Get('logout')
   logout(@Res() reply: HttpReply): void {
     reply.header('Set-Cookie', this.session.clearCookieHeader());
-    reply.redirect('/dashboard');
+    reply.code(302).redirect('/dashboard');
   }
 }

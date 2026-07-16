@@ -20,7 +20,7 @@ export class DashboardController {
     if (this.authEnabled) {
       const sess = this.session.getSession(req);
       if (!sess) {
-        reply.redirect('/auth/login');
+        reply.code(302).redirect('/auth/login');
         return;
       }
       userBadge = `<span style="margin-left:auto;font-size:12px;color:#8b949e">${sess.login} · <a href="/auth/logout" style="color:#58a6ff">Logout</a></span>`;

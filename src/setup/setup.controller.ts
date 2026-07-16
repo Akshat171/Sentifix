@@ -27,7 +27,7 @@ export class SetupController {
     if (this.authEnabled) {
       const sess = this.session.getSession(req);
       if (!sess) {
-        reply.redirect('/auth/login');
+        reply.code(302).redirect('/auth/login');
         return;
       }
       installations = sess.superuser
