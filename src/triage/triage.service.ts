@@ -10,6 +10,7 @@ import { InstallationRepository } from '../persistence/entities/installation-rep
 import { Issue } from '../persistence/entities/issue.entity';
 import { Run } from '../persistence/entities/run.entity';
 import { TriageJobPayload } from '../queue/queue.producer';
+import { QuotaService } from '../quota/quota.service';
 import { DataSource } from 'typeorm';
 
 /**
@@ -32,6 +33,7 @@ export class TriageService {
     private readonly judge: EvalJudge,
     private readonly github: GithubService,
     private readonly indexingJob: IndexingJob,
+    private readonly quota: QuotaService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -39,6 +41,19 @@ export class TriageService {
     const issue = await this.issueRepo.findOne({ where: { id: job.issueId } });
     if (!issue) {
       this.logger.warn(`Issue ${job.issueId} not found, skipping triage`);
+      return;
+    }
+
+    // Per-tenant daily cap — protects LLM spend on public multi-tenant deploys
+    const quota = await this.quota.check(job.repoFullName);
+    if (!quota.allowed) {
+      this.logger.warn(`Triage quota reached for ${job.repoFullName}: ${quota.used}/${quota.limit}/day`);
+      const body = [
+        '## 🤖 Sentifix — daily limit reached',
+        '',
+        `This account has hit its automated-triage limit (**${quota.limit}/day**). Triage resumes once the 24h window rolls over.`,
+      ].join('\n');
+      await this.github.postNotice(job.repoFullName, job.githubIssueNumber, issue.githubCommentId, body);
       return;
     }
 

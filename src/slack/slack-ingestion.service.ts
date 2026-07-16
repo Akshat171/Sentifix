@@ -6,6 +6,7 @@ import { AgentPipeline } from '../agent/agent.pipeline';
 import { EvalJudge } from '../eval/eval.judge';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
+import { QuotaService } from '../quota/quota.service';
 import { Issue } from '../persistence/entities/issue.entity';
 import { Run } from '../persistence/entities/run.entity';
 import { EvalResult } from '../persistence/entities/eval-result.entity';
@@ -35,6 +36,7 @@ export class SlackIngestionService {
     private readonly github: GithubService,
     private readonly slackService: SlackService,
     private readonly indexingJob: IndexingJob,
+    private readonly quota: QuotaService,
     private readonly dataSource: DataSource,
     config: ConfigService,
   ) {
@@ -62,6 +64,19 @@ export class SlackIngestionService {
       this.defaultRepo;
     if (!repoFullName) {
       this.logger.warn('No repo detected and no default repo configured — skipping');
+      return;
+    }
+
+    // 1b. Per-tenant daily cap
+    const quota = await this.quota.check(repoFullName);
+    if (!quota.allowed) {
+      this.logger.warn(`Slack triage quota reached for ${repoFullName}: ${quota.used}/${quota.limit}/day`);
+      await this.slackService.postNotice(
+        event.channel,
+        threadTs,
+        event.team,
+        `⚠️ Daily triage limit reached (${quota.limit}/day). Please try again once the 24h window rolls over.`,
+      );
       return;
     }
 

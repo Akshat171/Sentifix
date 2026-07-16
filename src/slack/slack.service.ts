@@ -80,6 +80,17 @@ export class SlackService {
     }
   }
 
+  /** Post a plain text message in a thread (used for quota/limit notices). */
+  async postNotice(channel: string, threadTs: string, teamId: string | undefined, text: string): Promise<void> {
+    const client = await this.getClient(teamId);
+    if (!client) return;
+    try {
+      await client.chat.postMessage({ channel, thread_ts: threadTs, text });
+    } catch (err) {
+      this.logger.error(`Failed to post Slack notice: ${(err as Error).message}`);
+    }
+  }
+
   async updateWithTriageResult(payload: SlackTriagePayload): Promise<void> {
     const client = await this.getClient(payload.teamId);
     if (!client) return;

@@ -22,6 +22,9 @@ export const configSchema = Joi.object({
   SENTIFIX_TRIGGER: Joi.string()
     .pattern(/^(all|command|label:.+)$/)
     .default('all'),
+  // Max triage runs per tenant (GitHub installation, else per repo) per rolling 24h.
+  // Protects your LLM spend on a public multi-tenant deploy. 0 = unlimited.
+  TRIAGE_DAILY_LIMIT: Joi.number().default(0),
   API_KEY: Joi.string().optional(),
   // Multi-tenant SaaS mode: require GitHub login and scope the dashboard/API to the
   // signed-in user's installations. Off (default) = open single-tenant self-host.

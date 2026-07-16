@@ -111,6 +111,26 @@ export class GithubService {
     }
   }
 
+  /** Post or (if commentId given) update a plain notice comment — used for quota/limit messages. */
+  async postNotice(
+    repoFullName: string,
+    issueNumber: number,
+    commentId: number | null,
+    body: string,
+  ): Promise<void> {
+    const [owner, repo] = repoFullName.split('/');
+    try {
+      const octokit = await this.getOctokit(repoFullName);
+      if (commentId) {
+        await octokit.issues.updateComment({ owner, repo, comment_id: commentId, body });
+      } else {
+        await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body });
+      }
+    } catch (err) {
+      this.logger.error(`Failed to post notice on ${repoFullName}#${issueNumber}: ${(err as Error).message}`);
+    }
+  }
+
   async postTriageComment(payload: TriageCommentPayload): Promise<void> {
     const [owner, repo] = payload.repoFullName.split('/');
     const body = this.formatComment(payload);
