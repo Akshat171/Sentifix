@@ -55,15 +55,18 @@ export class SlackIngestionService {
 
     this.logger.log(`Slack mention from ${event.user} in ${event.channel}: "${cleanText.slice(0, 80)}"`);
 
-    // 1. Detect repo from message or use default
-    const repoFullName = this.detectRepo(cleanText) ?? this.defaultRepo;
+    // 1. Detect repo: message → per-workspace default → global default
+    const repoFullName =
+      this.detectRepo(cleanText) ??
+      (await this.slackService.defaultRepoForTeam(event.team)) ??
+      this.defaultRepo;
     if (!repoFullName) {
-      this.logger.warn('No repo detected and SLACK_DEFAULT_REPO not set — skipping');
+      this.logger.warn('No repo detected and no default repo configured — skipping');
       return;
     }
 
-    // 2. Post placeholder reply immediately
-    const placeholderTs = await this.slackService.postPlaceholder(event.channel, threadTs);
+    // 2. Post placeholder reply immediately (uses this workspace's bot token)
+    const placeholderTs = await this.slackService.postPlaceholder(event.channel, threadTs, event.team);
 
     // 3. Persist as an Issue so it appears in the dashboard
     const issue = await this.issueRepo.save(
@@ -140,6 +143,7 @@ export class SlackIngestionService {
           channel: event.channel,
           threadTs,
           placeholderTs,
+          teamId: event.team,
           classification: output.classification as unknown as Record<string, unknown>,
           diagnosis: output.diagnosis as unknown as Record<string, unknown>,
           proposedDiff: output.proposedDiff,

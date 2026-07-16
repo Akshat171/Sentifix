@@ -139,6 +139,7 @@ Propose fix (unified diff)  →  LLM-as-judge score  →  Comment + open PR</div
           <div class="ico">💬</div>
           <h3>Slack</h3>
           <p>Tag <strong>@Sentifix</strong> in any channel with an error or stack trace. It replies in-thread with the severity, root cause, a diff preview, and a link to the PR — no context-switch to GitHub.</p>
+          <a class="btn btn-ghost" style="margin-top:14px;font-size:13px;padding:8px 16px" href="/slack/install">💬 Add to Slack</a>
         </div>
       </div>
     </div>

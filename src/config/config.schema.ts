@@ -36,9 +36,12 @@ export const configSchema = Joi.object({
   GITHUB_APP_CLIENT_ID: Joi.string().optional(),
   GITHUB_APP_CLIENT_SECRET: Joi.string().optional(),
   // Slack integration
-  SLACK_BOT_TOKEN: Joi.string().optional(),       // xoxb-...
-  SLACK_SIGNING_SECRET: Joi.string().optional(),  // for request verification
-  SLACK_DEFAULT_REPO: Joi.string().optional(),    // fallback owner/repo when not detectable
+  SLACK_BOT_TOKEN: Joi.string().optional(),       // xoxb-... (legacy single-workspace fallback)
+  SLACK_SIGNING_SECRET: Joi.string().optional(),  // per-app; verifies all inbound requests
+  SLACK_DEFAULT_REPO: Joi.string().optional(),    // global fallback owner/repo when not detectable
+  // Slack OAuth (multi-tenant "Add to Slack" — each workspace installs & we store its bot token)
+  SLACK_CLIENT_ID: Joi.string().optional(),
+  SLACK_CLIENT_SECRET: Joi.string().optional(),
   // OpenTelemetry
   OTEL_ENABLED: Joi.boolean().default(false),
   OTEL_SERVICE_NAME: Joi.string().default('sentifix'),

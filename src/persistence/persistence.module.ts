@@ -6,6 +6,7 @@ import { Installation } from './entities/installation.entity';
 import { InstallationRepository } from './entities/installation-repository.entity';
 import { Issue } from './entities/issue.entity';
 import { Run } from './entities/run.entity';
+import { SlackInstallation } from './entities/slack-installation.entity';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { Run } from './entities/run.entity';
         return {
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [Issue, Run, EvalResult, Installation, InstallationRepository],
+          entities: [Issue, Run, EvalResult, Installation, InstallationRepository, SlackInstallation],
           // Entity tables have no migrations — synchronize creates them.
           // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).
           synchronize: !isProd || config.get<boolean>('DB_SYNCHRONIZE') === true,

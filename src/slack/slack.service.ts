@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { KnownBlock, WebClient } from '@slack/web-api';
+import { SlackInstallation } from '../persistence/entities/slack-installation.entity';
 
 export interface SlackTriagePayload {
   channel: string;
   threadTs: string;
   placeholderTs: string;
+  teamId?: string;
   classification: Record<string, unknown>;
   diagnosis: Record<string, unknown>;
   proposedDiff: string;
@@ -25,19 +29,37 @@ const SEV_EMOJI: Record<string, string> = {
 @Injectable()
 export class SlackService {
   private readonly logger = new Logger(SlackService.name);
-  private readonly client: WebClient | null;
-  readonly enabled: boolean;
+  private readonly fallbackToken?: string; // legacy single-workspace token from env
 
-  constructor(config: ConfigService) {
-    const token = config.get<string>('SLACK_BOT_TOKEN');
-    this.enabled = !!token;
-    this.client = token ? new WebClient(token) : null;
+  constructor(
+    config: ConfigService,
+    @InjectRepository(SlackInstallation)
+    private readonly installRepo: Repository<SlackInstallation>,
+  ) {
+    this.fallbackToken = config.get<string>('SLACK_BOT_TOKEN');
   }
 
-  async postPlaceholder(channel: string, threadTs: string): Promise<string | null> {
-    if (!this.client) return null;
+  /** Resolve the bot token for a workspace (per-tenant), falling back to the env token. */
+  private async getClient(teamId?: string): Promise<WebClient | null> {
+    if (teamId) {
+      const inst = await this.installRepo.findOne({ where: { teamId } });
+      if (inst?.botToken) return new WebClient(inst.botToken);
+    }
+    return this.fallbackToken ? new WebClient(this.fallbackToken) : null;
+  }
+
+  /** Per-workspace default repo (set at install time), if any. */
+  async defaultRepoForTeam(teamId?: string): Promise<string | null> {
+    if (!teamId) return null;
+    const inst = await this.installRepo.findOne({ where: { teamId } });
+    return inst?.defaultRepo ?? null;
+  }
+
+  async postPlaceholder(channel: string, threadTs: string, teamId?: string): Promise<string | null> {
+    const client = await this.getClient(teamId);
+    if (!client) return null;
     try {
-      const res = await this.client.chat.postMessage({
+      const res = await client.chat.postMessage({
         channel,
         thread_ts: threadTs,
         text: '🤖 Sentifix is analyzing this error...',
@@ -59,7 +81,8 @@ export class SlackService {
   }
 
   async updateWithTriageResult(payload: SlackTriagePayload): Promise<void> {
-    if (!this.client) return;
+    const client = await this.getClient(payload.teamId);
+    if (!client) return;
 
     const cls = payload.classification as { severity?: string; category?: string; affectedComponents?: string[] };
     const diag = payload.diagnosis as { rootCause?: string; hypothesis?: string };
@@ -124,7 +147,7 @@ export class SlackService {
     });
 
     try {
-      await this.client.chat.update({
+      await client.chat.update({
         channel: payload.channel,
         ts: payload.placeholderTs,
         text: `Sentifix triage complete — ${sevEmoji} ${this.cap(cls.severity ?? '')} / score ${score}/100`,
