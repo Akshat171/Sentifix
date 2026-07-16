@@ -172,7 +172,12 @@ export class TriageService {
   }
 
   async getAllIssues(scope?: TenantScope): Promise<Issue[]> {
-    const where = await this.scopeWhere(scope);
+    let where: FindOptionsWhere<Issue> | undefined;
+    if (scope !== undefined) {
+      const repos = await this.reposForScope(scope);
+      if (!repos.length) return []; // no accessible repos → nothing to show
+      where = { repoFullName: In(repos) };
+    }
     return this.issueRepo.find({
       ...(where ? { where } : {}),
       order: { createdAt: 'DESC' },
@@ -205,12 +210,6 @@ export class TriageService {
     return rows.map((r) => r.repoFullName);
   }
 
-  private async scopeWhere(scope?: TenantScope): Promise<FindOptionsWhere<Issue> | undefined> {
-    if (scope === undefined) return undefined; // unrestricted
-    const repos = await this.reposForScope(scope);
-    // No accessible repos → match nothing (never fall back to "all")
-    return { repoFullName: In(repos.length ? repos : [' none']) };
-  }
 
   /** Throw unless the repo is visible to the scope (no-op when unrestricted). */
   async assertRepoInScope(repoFullName: string, scope?: TenantScope): Promise<void> {
