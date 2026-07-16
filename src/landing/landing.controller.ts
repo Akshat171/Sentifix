@@ -107,13 +107,15 @@ export class LandingController {
 
     .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
     .tile{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;padding:26px}
-    .tile .ic{width:40px;height:40px;border-radius:11px;background:#c9644214;display:flex;align-items:center;justify-content:center;font-size:19px;margin-bottom:16px}
+    .tile .ic{width:42px;height:42px;border-radius:11px;background:#c9644214;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+    .tile .ic svg{width:21px;height:21px;fill:none;stroke:var(--clay);stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
     .tile h3{font-size:16px;font-weight:600;margin-bottom:6px}
     .tile p{font-size:14.5px;color:var(--ink-soft)}
 
     .chan{display:grid;grid-template-columns:1fr 1fr;gap:20px}
     .chan .box{background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:30px}
-    .chan .box .ic{font-size:24px;margin-bottom:14px}
+    .chan .box .ic{margin-bottom:16px;height:34px;display:flex;align-items:center}
+    .chan .box .ic svg{height:32px;width:auto}
     .chan .box h3{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:8px}
     .chan .box p{font-size:15px;color:var(--ink-soft);margin-bottom:18px}
     .chan code{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
@@ -176,7 +178,7 @@ export class LandingController {
 
       <!-- product mockup -->
       <div class="mock">
-        <div class="float">🩹 <span>Triaged in ~30s</span></div>
+        <div class="float"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c96442" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> <span>Triaged in ~30s</span></div>
         <div class="card issue">
           <div class="win-dots"><i></i><i></i><i></i></div>
           <div class="tag">ISSUE #128 · opened</div>
@@ -191,7 +193,7 @@ export class LandingController {
           </div>
           <div class="bar"><i></i></div>
           <div class="rc"><b>Root cause:</b> the tap handler isn’t bound to <code style="font-size:12px">touchend</code>, so <code style="font-size:12px">onClick</code> never fires in mobile Safari’s auth flow.</div>
-          <span class="pr">🔀 Pull request #129 opened →</span>
+          <span class="pr"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg> Pull request #129 opened →</span>
         </div>
       </div>
     </section>
@@ -217,12 +219,12 @@ export class LandingController {
         <h2 class="serif">Everything from issue to merge.</h2>
       </div>
       <div class="grid3">
-        <div class="tile"><div class="ic">🔍</div><h3>Grounded RAG</h3><p>Hybrid BM25 + vector search keeps every fix tied to your real code — not a hallucination.</p></div>
-        <div class="tile"><div class="ic">🔀</div><h3>Automatic PRs</h3><p>Applies the diff to a fresh branch and opens a pull request you review like any other.</p></div>
-        <div class="tile"><div class="ic">⚖️</div><h3>Scored by a judge</h3><p>Correctness, completeness, safety and clarity — rated before the fix reaches you.</p></div>
-        <div class="tile"><div class="ic">🔒</div><h3>Multi-tenant &amp; private</h3><p>Per-installation isolation. Your code is scoped to your org, never shared across tenants.</p></div>
-        <div class="tile"><div class="ic">🎚️</div><h3>You stay in control</h3><p>Trigger on every issue, a label, or an explicit <code style="font-size:12px">/sentifix</code> — with a daily cap.</p></div>
-        <div class="tile"><div class="ic">🧩</div><h3>Open source</h3><p>MIT licensed. Self-host it, read every line, extend the pipeline to fit your stack.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h3>Grounded RAG</h3><p>Hybrid BM25 + vector search keeps every fix tied to your real code — not a hallucination.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg></div><h3>Automatic PRs</h3><p>Applies the diff to a fresh branch and opens a pull request you review like any other.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg></div><h3>Scored by a judge</h3><p>Correctness, completeness, safety and clarity — rated before the fix reaches you.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Multi-tenant &amp; private</h3><p>Per-installation isolation. Your code is scoped to your org, never shared across tenants.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></div><h3>You stay in control</h3><p>Trigger on every issue, a label, or an explicit <code style="font-size:12px">/sentifix</code> — with a daily cap.</p></div>
+        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></div><h3>Open source</h3><p>MIT licensed. Self-host it, read every line, extend the pipeline to fit your stack.</p></div>
       </div>
     </section>
 
@@ -234,13 +236,13 @@ export class LandingController {
       </div>
       <div class="chan">
         <div class="box">
-          <div class="ic">🐙</div>
+          <div class="ic"><svg viewBox="0 0 16 16" style="fill:var(--ink);stroke:none"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
           <h3>GitHub</h3>
           <p>Open an issue, or comment <code>/sentifix</code> on any existing one. The triage and a ready-to-review pull request land right on the issue.</p>
           <a class="btn btn-primary" href="${install}">Add to GitHub</a>
         </div>
         <div class="box">
-          <div class="ic">💬</div>
+          <div class="ic"><svg viewBox="0 0 122.8 122.8" style="stroke:none"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9z" fill="#e01e5a"/><path d="M32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#e01e5a"/><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2z" fill="#36c5f0"/><path d="M45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36c5f0"/><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2z" fill="#2eb67d"/><path d="M90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2eb67d"/><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9z" fill="#ecb22e"/><path d="M77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ecb22e"/></svg></div>
           <h3>Slack</h3>
           <p>Tag <strong>@Sentifix</strong> in any channel with an error or stack trace. It replies in-thread with the root cause, a diff preview, and a link to the PR.</p>
           <a class="btn btn-ghost" href="/slack/install">Add to Slack</a>
