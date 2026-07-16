@@ -73,6 +73,7 @@ export class LandingController {
       <nav class="nav">
         <a href="#how">How it works</a>
         <a href="#features">Features</a>
+        <a href="#channels">Integrations</a>
         <a href="https://github.com/Akshat171/Sentifix" target="_blank">GitHub</a>
         <a href="/dashboard">Dashboard</a>
       </nav>
@@ -120,6 +121,25 @@ Propose fix (unified diff)  →  LLM-as-judge score  →  Comment + open PR</div
         <div class="feat"><div class="ico">⚖️</div><h3>LLM-as-judge</h3><p>Every proposed fix is scored for correctness, safety, and clarity.</p></div>
         <div class="feat"><div class="ico">💬</div><h3>GitHub &amp; Slack</h3><p>Triage from a new issue, a /sentifix comment, or an @mention.</p></div>
         <div class="feat"><div class="ico">🔒</div><h3>Multi-tenant &amp; secure</h3><p>Per-installation isolation; your code stays scoped to your org.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="channels">
+    <div class="wrap">
+      <h2>Where it works</h2>
+      <div class="lead">Triage from wherever bugs get reported.</div>
+      <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+        <div class="feat">
+          <div class="ico">🐙</div>
+          <h3>GitHub</h3>
+          <p>Open an issue — or comment <code style="background:#0d1117;padding:1px 6px;border-radius:4px">/sentifix</code> on any issue. Sentifix triages it and opens a pull request with the proposed fix, right on the issue.</p>
+        </div>
+        <div class="feat">
+          <div class="ico">💬</div>
+          <h3>Slack</h3>
+          <p>Tag <strong>@Sentifix</strong> in any channel with an error or stack trace. It replies in-thread with the severity, root cause, a diff preview, and a link to the PR — no context-switch to GitHub.</p>
+        </div>
       </div>
     </div>
   </section>
