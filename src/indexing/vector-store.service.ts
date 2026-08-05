@@ -13,6 +13,7 @@ export interface SearchResult {
   filePath: string;
   content: string;
   similarity: number;
+  chunkIndex?: number;
   source?: 'vector' | 'bm25' | 'hybrid';
 }
 
@@ -63,18 +64,28 @@ export class VectorStoreService {
     queryEmbedding: number[],
     limit = 10,
   ): Promise<SearchResult[]> {
-    const rows: Array<{ file_path: string; content: string; similarity: number }> =
-      await this.dataSource.query(
-        `SELECT file_path, content,
+    const rows: Array<{
+      file_path: string;
+      content: string;
+      similarity: number;
+      chunk_index: number;
+    }> = await this.dataSource.query(
+      `SELECT file_path, content, chunk_index,
                 1 - (embedding <=> $1::vector) AS similarity
          FROM code_chunks
          WHERE repo_full_name = $2
          ORDER BY embedding <=> $1::vector
          LIMIT $3`,
-        [JSON.stringify(queryEmbedding), repoFullName, limit],
-      );
+      [JSON.stringify(queryEmbedding), repoFullName, limit],
+    );
 
-    return rows.map((r) => ({ filePath: r.file_path, content: r.content, similarity: r.similarity, source: 'vector' as const }));
+    return rows.map((r) => ({
+      filePath: r.file_path,
+      content: r.content,
+      similarity: r.similarity,
+      chunkIndex: r.chunk_index,
+      source: 'vector' as const,
+    }));
   }
 
   // ── Hybrid search: vector + BM25 fused with RRF ──────────────────────────
@@ -90,24 +101,34 @@ export class VectorStoreService {
     // Run both searches in parallel
     const [vectorRows, bm25Rows] = await Promise.all([
       this.dataSource.query(
-        `SELECT file_path, content,
+        `SELECT file_path, content, chunk_index,
                 1 - (embedding <=> $1::vector) AS similarity
          FROM code_chunks
          WHERE repo_full_name = $2
          ORDER BY embedding <=> $1::vector
          LIMIT $3`,
         [JSON.stringify(queryEmbedding), repoFullName, candidateCount],
-      ) as Promise<Array<{ file_path: string; content: string; similarity: number }>>,
+      ) as Promise<
+        Array<{ file_path: string; content: string; similarity: number; chunk_index: number }>
+      >,
 
       this.bm25Search(repoFullName, queryText, candidateCount),
     ]);
 
     const vectorResults: SearchResult[] = vectorRows.map((r) => ({
-      filePath: r.file_path, content: r.content, similarity: r.similarity, source: 'vector' as const,
+      filePath: r.file_path,
+      content: r.content,
+      similarity: r.similarity,
+      chunkIndex: r.chunk_index,
+      source: 'vector' as const,
     }));
 
     const bm25Results: SearchResult[] = bm25Rows.map((r) => ({
-      filePath: r.file_path, content: r.content, similarity: r.similarity, source: 'bm25' as const,
+      filePath: r.file_path,
+      content: r.content,
+      similarity: r.similarity,
+      chunkIndex: r.chunk_index,
+      source: 'bm25' as const,
     }));
 
     const fused = this.reciprocalRankFusion(vectorResults, bm25Results, limit);
@@ -122,25 +143,59 @@ export class VectorStoreService {
   // ── Direct file fetch (for stack trace hits) ──────────────────────────────
 
   async getChunksForFile(repoFullName: string, filePath: string): Promise<SearchResult[]> {
-    const rows: Array<{ file_path: string; content: string }> = await this.dataSource.query(
-      `SELECT file_path, content
+    const rows: Array<{ file_path: string; content: string; chunk_index: number }> =
+      await this.dataSource.query(
+        `SELECT file_path, content, chunk_index
        FROM code_chunks
        WHERE repo_full_name = $1
          AND (file_path = $2 OR file_path LIKE $3)
        ORDER BY chunk_index`,
-      [repoFullName, filePath, `%${filePath}`],
-    );
+        [repoFullName, filePath, `%${filePath}`],
+      );
 
     return rows.map((r) => ({
       filePath: r.file_path,
       content: r.content,
       similarity: 1.0,
+      chunkIndex: r.chunk_index,
+      source: 'vector' as const,
+    }));
+  }
+
+  /**
+   * Fetch chunks adjacent to a hit within ±radius of its chunk_index, so the
+   * caller can reassemble a whole function around a fragment that matched.
+   */
+  async getAdjacentChunks(
+    repoFullName: string,
+    filePath: string,
+    centerIndex: number,
+    radius = 1,
+  ): Promise<SearchResult[]> {
+    const rows: Array<{ file_path: string; content: string; chunk_index: number }> =
+      await this.dataSource.query(
+        `SELECT file_path, content, chunk_index
+         FROM code_chunks
+         WHERE repo_full_name = $1
+           AND file_path = $2
+           AND chunk_index BETWEEN $3 AND $4
+         ORDER BY chunk_index`,
+        [repoFullName, filePath, centerIndex - radius, centerIndex + radius],
+      );
+
+    return rows.map((r) => ({
+      filePath: r.file_path,
+      content: r.content,
+      similarity: 0.99,
+      chunkIndex: r.chunk_index,
       source: 'vector' as const,
     }));
   }
 
   async deleteRepo(repoFullName: string): Promise<void> {
-    await this.dataSource.query(`DELETE FROM code_chunks WHERE repo_full_name = $1`, [repoFullName]);
+    await this.dataSource.query(`DELETE FROM code_chunks WHERE repo_full_name = $1`, [
+      repoFullName,
+    ]);
     this.logger.log(`Deleted chunks for ${repoFullName}`);
   }
 
@@ -150,14 +205,16 @@ export class VectorStoreService {
     repoFullName: string,
     queryText: string,
     limit: number,
-  ): Promise<Array<{ file_path: string; content: string; similarity: number }>> {
+  ): Promise<
+    Array<{ file_path: string; content: string; similarity: number; chunk_index: number }>
+  > {
     try {
       // Sanitise query — remove special tsquery characters
       const safe = queryText.replace(/[&|!():*<>'"]/g, ' ').trim();
       if (!safe) return [];
 
       return await this.dataSource.query(
-        `SELECT file_path, content,
+        `SELECT file_path, content, chunk_index,
                 ts_rank_cd(tsv, plainto_tsquery('english', $1)) AS similarity
          FROM code_chunks
          WHERE repo_full_name = $2
@@ -196,6 +253,10 @@ export class VectorStoreService {
     return [...scores.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, limit)
-      .map(([key, score]) => ({ ...content.get(key)!, similarity: score, source: 'hybrid' as const }));
+      .map(([key, score]) => ({
+        ...content.get(key)!,
+        similarity: score,
+        source: 'hybrid' as const,
+      }));
   }
 }

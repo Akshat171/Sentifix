@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Octokit } from '@octokit/rest';
 import { LlmProvider } from '../llm/llm.provider';
+import { chunkCode } from './code-chunker';
 import { VectorStoreService } from './vector-store.service';
 
 export interface IndexRepoPayload {
@@ -84,7 +85,10 @@ export class IndexingJob {
         const result = fileContents[j];
         if (result.status === 'rejected') continue;
         const content = result.value;
-        const fileChunks = this.chunkText(content);
+        const fileChunks = chunkCode(content, batch[j].path, {
+          maxSize: CHUNK_SIZE,
+          overlap: CHUNK_OVERLAP,
+        });
         for (let k = 0; k < fileChunks.length; k++) {
           textBatches.push(`File: ${batch[j].path}\n\n${fileChunks[k]}`);
           metaBatches.push({ path: batch[j].path, idx: k });
@@ -139,15 +143,5 @@ export class IndexingJob {
   private async fetchFileContent(owner: string, repo: string, fileSha: string): Promise<string> {
     const { data } = await this.octokit.git.getBlob({ owner, repo, file_sha: fileSha });
     return Buffer.from(data.content, data.encoding as BufferEncoding).toString('utf-8');
-  }
-
-  private chunkText(text: string): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-    while (start < text.length) {
-      chunks.push(text.slice(start, start + CHUNK_SIZE));
-      start += CHUNK_SIZE - CHUNK_OVERLAP;
-    }
-    return chunks.filter((c) => c.trim().length > 0);
   }
 }
