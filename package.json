@@ -23,6 +23,9 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "typeorm-ts-node-commonjs",
     "test:pipeline": "ts-node -r tsconfig-paths/register scripts/test-pipeline.ts",
+    "eval": "ts-node -r tsconfig-paths/register scripts/eval.ts",
+    "embed:ab": "ts-node -r tsconfig-paths/register scripts/embed-ab.ts",
+    "index:local": "ts-node -r tsconfig-paths/register scripts/index-local.ts",
     "simulate:webhook": "bash scripts/simulate-webhook.sh"
   },
   "dependencies": {

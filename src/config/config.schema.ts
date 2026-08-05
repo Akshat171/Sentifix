@@ -11,7 +11,15 @@ export const configSchema = Joi.object({
   RABBITMQ_URL: Joi.string().uri().required(),
   OPENAI_API_KEY: Joi.string().required(),
   OPENAI_CHAT_MODEL: Joi.string().default('gpt-4o-mini'),
+  // Model used by the LLM-as-judge eval. Defaults to a different, stronger model
+  // than OPENAI_CHAT_MODEL so the judge doesn't grade its own output (self-preference bias).
+  OPENAI_JUDGE_MODEL: Joi.string().default('gpt-4o'),
   OPENAI_EMBEDDING_MODEL: Joi.string().default('text-embedding-3-small'),
+  // Precision stage: after retrieval casts a wide net, an LLM reranker scores each
+  // candidate chunk for relevance and keeps only the top RERANK_TOP_N for the fix prompt.
+  RERANK_ENABLED: Joi.boolean().default(true),
+  RERANK_TOP_N: Joi.number().default(8),
+  OPENAI_RERANK_MODEL: Joi.string().optional(), // defaults to OPENAI_CHAT_MODEL
   GITHUB_WEBHOOK_SECRET: Joi.string().required(),
   GITHUB_TOKEN: Joi.string().optional(),
   // Which issues to auto-triage:
@@ -31,7 +39,7 @@ export const configSchema = Joi.object({
   // When on, needs SESSION_SECRET, APP_BASE_URL, and GITHUB_APP_CLIENT_ID/SECRET.
   DASHBOARD_AUTH: Joi.boolean().default(false),
   SESSION_SECRET: Joi.string().optional(),   // HMAC secret for signing the session cookie
-  APP_BASE_URL: Joi.string().uri().optional(), // public base URL, e.g. https://api.sentifix.online
+  APP_BASE_URL: Joi.string().uri().optional(), // public base URL, e.g. https://sentifix.dev
   // GitHub App (optional — enables one-click install flow)
   GITHUB_APP_ID: Joi.number().optional(),
   GITHUB_APP_PRIVATE_KEY: Joi.string().optional(), // PEM with \n escaped as \\n

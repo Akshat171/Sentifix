@@ -20,9 +20,9 @@ export class LlmProvider {
     this.embeddingModel = config.get<string>('OPENAI_EMBEDDING_MODEL') ?? 'text-embedding-3-small';
   }
 
-  async chat(messages: ChatMessage[], jsonMode = false): Promise<string> {
+  async chat(messages: ChatMessage[], jsonMode = false, model?: string): Promise<string> {
     const response = await this.client.chat.completions.create({
-      model: this.chatModel,
+      model: model ?? this.chatModel,
       messages,
       ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     });
