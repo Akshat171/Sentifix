@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { LlmProvider } from '../llm/llm.provider';
 import { VectorStoreService } from '../indexing/vector-store.service';
+import { RerankerService } from './reranker.service';
+import { collectSignalPaths, planNeighborFetch, prioritizeBySignals } from './context-expansion';
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +25,7 @@ export interface RetrievedContext {
   filePath: string;
   content: string;
   similarity: number;
+  chunkIndex?: number;
 }
 
 export interface DiagnosisResult {
@@ -58,18 +61,21 @@ export class AgentPipeline {
   constructor(
     private readonly llm: LlmProvider,
     private readonly vectorStore: VectorStoreService,
+    private readonly reranker: RerankerService,
   ) {
     this.graph = new StateGraph(PipelineState)
       .addNode('classify', this.classifyNode.bind(this))
       .addNode('retrieve', this.retrieveNode.bind(this))
       .addNode('diagnose', this.diagnoseNode.bind(this))
       .addNode('retrieveTargeted', this.retrieveTargetedNode.bind(this))
+      .addNode('rerank', this.rerankNode.bind(this))
       .addNode('proposeFix', this.proposeFixNode.bind(this))
       .addEdge(START, 'classify')
       .addEdge('classify', 'retrieve')
       .addEdge('retrieve', 'diagnose')
       .addEdge('diagnose', 'retrieveTargeted')
-      .addEdge('retrieveTargeted', 'proposeFix')
+      .addEdge('retrieveTargeted', 'rerank')
+      .addEdge('rerank', 'proposeFix')
       .addEdge('proposeFix', END)
       .compile();
   }
@@ -129,10 +135,15 @@ Respond with valid JSON matching this schema:
     const results: RetrievedContext[] = [];
     const seen = new Set<string>();
 
-    const add = (chunks: Array<{ filePath: string; content: string; similarity: number }>) => {
+    const add = (
+      chunks: Array<{ filePath: string; content: string; similarity: number; chunkIndex?: number }>,
+    ) => {
       for (const c of chunks) {
         const key = `${c.filePath}::${c.content.slice(0, 50)}`;
-        if (!seen.has(key)) { seen.add(key); results.push(c); }
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push(c);
+        }
       }
     };
 
@@ -174,8 +185,55 @@ Respond with valid JSON matching this schema:
       add(rawResults);
     }
 
-    this.logger.log(`retrieve: ${results.length} total chunks (trace=${traceFiles.length > 0})`);
-    return { context: results.slice(0, 20) };
+    // ── Neighbour expansion ───────────────────────────────────────────────
+    // Pull the chunks adjacent to the strongest hits so the LLM sees whole
+    // functions rather than the fragment that happened to match.
+    await this.expandNeighbors(state.issue.repoFullName, results, seen);
+
+    // ── Structural prioritisation ─────────────────────────────────────────
+    // Chunks in stack-trace files or classifier-flagged components rank ahead
+    // of purely semantic matches, so they survive the token-budget cap.
+    const signals = collectSignalPaths(state.classification?.affectedComponents, traceFiles);
+    const ordered = prioritizeBySignals(results, signals);
+
+    this.logger.log(`retrieve: ${ordered.length} total chunks (trace=${traceFiles.length > 0})`);
+    return { context: ordered.slice(0, 20) };
+  }
+
+  /**
+   * Fetch neighbour chunks (±1) for the top hits and append any not already
+   * present, so retrieval hands the LLM contiguous code instead of fragments.
+   */
+  private async expandNeighbors(
+    repoFullName: string,
+    results: RetrievedContext[],
+    seen: Set<string>,
+  ): Promise<void> {
+    const present = new Set(results.map((r) => `${r.filePath}#${r.chunkIndex}`));
+    const requests = planNeighborFetch(results.slice(0, 8), present, 1);
+    if (requests.length === 0) return;
+
+    for (const req of requests) {
+      const neighbors = await this.vectorStore.getAdjacentChunks(
+        repoFullName,
+        req.filePath,
+        req.index,
+        0,
+      );
+      for (const n of neighbors) {
+        const key = `${n.filePath}::${n.content.slice(0, 50)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          results.push({
+            filePath: n.filePath,
+            content: n.content,
+            similarity: n.similarity,
+            chunkIndex: n.chunkIndex,
+          });
+        }
+      }
+    }
+    this.logger.log(`retrieve: neighbour expansion fetched ${requests.length} adjacent chunks`);
   }
 
   /**
@@ -292,7 +350,12 @@ Given the issue and relevant code context, produce valid JSON:
       for (const r of results) {
         if (!existingPaths.has(r.filePath)) {
           existingPaths.add(r.filePath);
-          newChunks.push({ filePath: r.filePath, content: r.content, similarity: r.similarity });
+          newChunks.push({
+            filePath: r.filePath,
+            content: r.content,
+            similarity: r.similarity,
+            chunkIndex: r.chunkIndex,
+          });
         }
       }
     }
@@ -302,6 +365,21 @@ Given the issue and relevant code context, produce valid JSON:
     // Merge: targeted chunks first (most relevant), then original context
     const merged = [...newChunks, ...state.context].slice(0, 15);
     return { context: merged };
+  }
+
+  /**
+   * Precision stage. Retrieval optimises recall (wide net via HyDE + hybrid +
+   * targeted passes); this narrows the merged candidate set to the most relevant
+   * chunks for the fix prompt, so the LLM sees signal rather than a padded 15.
+   */
+  private async rerankNode(state: PState): Promise<Partial<PState>> {
+    if (state.context.length === 0) return {};
+
+    const query = `${state.issue.title}\n${state.diagnosis?.rootCause ?? ''}\n${state.issue.body.slice(0, 500)}`;
+    const ranked = await this.reranker.rerank(query, state.context);
+
+    this.logger.log(`rerank: ${state.context.length} → ${ranked.length} chunks`);
+    return { context: ranked };
   }
 
   private async proposeFixNode(state: PState): Promise<Partial<PState>> {
@@ -340,7 +418,9 @@ Given the issue and relevant code context, produce valid JSON:
       .join('\n\n');
 
     const hasContext = contextBlock.length > 0;
-    this.logger.log(`proposeFix: building diff for ${usedPaths.length} files, hasContext=${hasContext}`);
+    this.logger.log(
+      `proposeFix: building diff for ${usedPaths.length} files, hasContext=${hasContext}`,
+    );
 
     const proposedDiff = await this.llm.chat([
       {
