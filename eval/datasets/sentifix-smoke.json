@@ -1,0 +1,51 @@
+{
+  "name": "sentifix-smoke",
+  "description": "Live smoke dataset over THIS repo — expectedFiles are real Sentifix paths, so `pnpm embed:ab --repo <sentifix> --dataset sentifix-smoke` yields genuine recall numbers. Not a production dataset.",
+  "cases": [
+    {
+      "id": "reranker-fallback",
+      "repoFullName": "beluga/sentifix",
+      "issue": {
+        "title": "Reranker should fall back to retrieval order when the LLM returns invalid JSON",
+        "body": "The precision-stage reranker scores each candidate chunk for relevance with an LLM and keeps the top-N. If the model returns malformed JSON the whole triage must not break — it should log a warning and fall back to the original retrieval order. Where is the reranker service that does pointwise relevance scoring and top-N selection?"
+      },
+      "expectedFiles": ["src/agent/reranker.service.ts"]
+    },
+    {
+      "id": "code-chunker",
+      "repoFullName": "beluga/sentifix",
+      "issue": {
+        "title": "Code chunking splits functions in half instead of respecting boundaries",
+        "body": "Indexing should chunk source files on language-aware separators (function, class, def, func) so a small function stays intact and only oversized functions are split, with overlap. Which module implements the recursive character splitter with per-language separators?"
+      },
+      "expectedFiles": ["src/indexing/code-chunker.ts"]
+    },
+    {
+      "id": "retrieval-metrics",
+      "repoFullName": "beluga/sentifix",
+      "issue": {
+        "title": "Compute recall@k, precision@k and MRR for retrieval evaluation",
+        "body": "The offline eval harness needs component-level retrieval metrics comparing retrieved file paths against ground-truth expected files, with fuzzy path matching. Where are recallAtK, precisionAtK and reciprocalRank defined?"
+      },
+      "expectedFiles": ["src/eval/retrieval-metrics.ts"]
+    },
+    {
+      "id": "judge-reference-model",
+      "repoFullName": "beluga/sentifix",
+      "issue": {
+        "title": "LLM-as-judge should use a separate model and reference-based scoring",
+        "body": "The eval judge grades a proposed diff across correctness/completeness/safety/clarity. It should support scoring against a reference solution and use a different judge model than the chat model to avoid self-preference bias. Which file implements the judge?"
+      },
+      "expectedFiles": ["src/eval/eval.judge.ts"]
+    },
+    {
+      "id": "context-expansion",
+      "repoFullName": "beluga/sentifix",
+      "issue": {
+        "title": "Prioritize stack-trace files and expand neighbouring chunks",
+        "body": "Retrieval should move chunks whose file matches a stack-trace file or a classifier-flagged component to the front, and pull adjacent chunks around a hit so the LLM sees whole functions. Where is the structural prioritization and neighbour planning logic?"
+      },
+      "expectedFiles": ["src/agent/context-expansion.ts"]
+    }
+  ]
+}

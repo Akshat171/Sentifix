@@ -1,0 +1,16 @@
+{
+  "name": "example",
+  "description": "Seed dataset. Replace/extend with real closed-issue cases: the files touched by the fixing PR are the ground-truth `expectedFiles`, and the merged PR diff is the optional `referenceDiff`. The repo named here must be indexed (POST /index) before running `pnpm eval`.",
+  "cases": [
+    {
+      "id": "auth-oauth-undefined-userid",
+      "repoFullName": "acme/my-api",
+      "source": "example (illustrative — stack trace names the ground-truth files)",
+      "issue": {
+        "title": "TypeError: Cannot read properties of undefined (reading \"userId\") in AuthService",
+        "body": "## Description\nAfter the recent refactor of AuthService, users get a 500 error when logging in with an OAuth provider. The error occurs in the token validation step.\n\n## Stack trace\n```\nTypeError: Cannot read properties of undefined (reading 'userId')\n    at AuthService.validateOAuthToken (src/auth/auth.service.ts:87:32)\n    at OAuthStrategy.validate (src/auth/oauth.strategy.ts:45:12)\n```\n\n## Steps to reproduce\n1. Visit /auth/google\n2. Complete Google OAuth flow\n3. Observe 500 Internal Server Error\n\n## Expected\nSuccessful redirect to /dashboard"
+      },
+      "expectedFiles": ["src/auth/auth.service.ts", "src/auth/oauth.strategy.ts"]
+    }
+  ]
+}
