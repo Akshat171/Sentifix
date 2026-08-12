@@ -5,12 +5,14 @@ import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { In, Repository } from 'typeorm';
 import { SessionService } from '../auth/session.service';
 import { Installation } from '../persistence/entities/installation.entity';
-import { GITHUB_ICON, page } from '../ui/theme';
+import { GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
 
 @Controller('setup')
 export class SetupController {
   private readonly appSlug: string;
   private readonly authEnabled: boolean;
+  /** Mirrors SlackOAuthService.configured — both halves of the OAuth pair must be present. */
+  private readonly slackEnabled: boolean;
 
   constructor(
     config: ConfigService,
@@ -19,6 +21,9 @@ export class SetupController {
   ) {
     this.appSlug = config.get<string>('GITHUB_APP_SLUG') ?? '';
     this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
+    this.slackEnabled = !!(
+      config.get<string>('SLACK_CLIENT_ID') && config.get<string>('SLACK_CLIENT_SECRET')
+    );
   }
 
   @Get()
@@ -73,6 +78,9 @@ body{display:flex;flex-direction:column;align-items:center;padding:48px 20px}
 .head{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
 .head h1{font-size:clamp(1.9rem,5vw,2.5rem)}
 .disabled{display:inline-flex;padding:13px 22px;border-radius:8px;background:var(--sunk);border:1px solid var(--line);color:var(--muted);font-size:.9375rem;font-weight:600}
+.actions{display:flex;flex-wrap:wrap;gap:12px}
+.hint{font-size:.875rem;color:var(--muted)}
+.hint code{font-size:.8125rem;background:var(--sunk);border:1px solid var(--line);padding:1px 6px;border-radius:4px}
 .block{display:flex;flex-direction:column;gap:12px}
 .repo{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:.8125rem}
 .repo-dot{width:7px;height:7px;border-radius:50%;background:var(--add);flex:none}
@@ -92,10 +100,22 @@ body{display:flex;flex-direction:column;align-items:center;padding:48px 20px}
     <a class="brand" href="/"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
     <h1>Connect a repository.</h1>
     <p class="lede">Install the GitHub App and Sentifix starts triaging new issues — root cause and a proposed patch, usually within 30 seconds.</p>
+    <div class="actions">
+      ${
+        installUrl
+          ? `<a class="btn btn-primary" href="${installUrl}">${GITHUB_ICON} Install on GitHub</a>`
+          : `<div class="disabled">Set GITHUB_APP_SLUG in .env to enable</div>`
+      }
+      ${
+        this.slackEnabled
+          ? `<a class="btn btn-outline" href="/slack/install">${SLACK_ICON} Add to Slack</a>`
+          : ''
+      }
+    </div>
     ${
-      installUrl
-        ? `<a class="btn btn-primary" href="${installUrl}">${GITHUB_ICON} Install on GitHub</a>`
-        : `<div class="disabled">Set GITHUB_APP_SLUG in .env to enable</div>`
+      this.slackEnabled
+        ? `<p class="hint">Optional — once added, anyone can report a bug by mentioning <code>@sentifix</code> in a channel, and the triage comes back in the thread.</p>`
+        : ''
     }
   </div>
 

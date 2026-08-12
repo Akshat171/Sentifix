@@ -1,6 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GITHUB_ICON, page } from '../ui/theme';
+import { GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
 
 @Controller()
 export class LandingController {
@@ -75,6 +75,18 @@ export class LandingController {
 .cards .card{padding:26px 24px 28px;display:flex;flex-direction:column;gap:12px}
 .cards .card p{color:var(--muted);font-size:.9375rem}
 .ico{width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.6}
+
+.intake{display:grid;gap:22px}
+@media (min-width:820px){.intake{grid-template-columns:1fr 1fr}}
+.lane{display:flex;flex-direction:column;gap:14px;padding:26px 24px 28px}
+.lane-h{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.875rem;font-weight:600;letter-spacing:-.01em}
+.lane p{color:var(--muted);font-size:.9375rem}
+.lane-note{font-size:.8125rem;margin-top:auto;padding-top:4px;border-top:1px solid var(--line)}
+.slack-thread{display:flex;flex-direction:column;gap:10px;background:var(--sunk);border:1px solid var(--line);border-radius:9px;padding:14px}
+.slack-msg{display:flex;flex-direction:column;gap:3px;font-size:.8125rem;line-height:1.5}
+.slack-reply{padding-left:12px;border-left:2px solid var(--accent)}
+.slack-who{font-family:var(--mono);font-size:.6875rem;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px}
+.slack-msg code{font-size:.75rem;background:var(--surface);border:1px solid var(--line);padding:1px 5px;border-radius:4px}
 
 .steps{display:grid;gap:2px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 @media (min-width:860px){.steps{grid-template-columns:repeat(3,1fr)}}
@@ -198,7 +210,7 @@ footer{border-top:1px solid var(--line);padding-block:34px}
       <div class="trust-row">
         <span><strong>MIT licensed</strong> — read every line</span>
         <span><strong>Self-host it</strong> — your code never leaves your infra</span>
-        <span><strong>GitHub App</strong> + Slack</span>
+        <span><strong>GitHub and Slack</strong> — report from either</span>
         <span><strong>Runs in ~30s</strong> per issue</span>
       </div>
     </div>
@@ -226,6 +238,37 @@ footer{border-top:1px solid var(--line);padding-block:34px}
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12" stroke-linecap="round"/><path d="m7 10 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
           <h3>Start from a patch, not a blank editor</h3>
           <p>You get a real unified diff you can read, argue with, or apply. Nothing is ever pushed or merged — the change stays a suggestion until a human says otherwise.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="slack">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">Two ways in</span>
+        <h2>Not every bug report starts as a GitHub issue.</h2>
+        <p class="lede">Plenty of them start as someone in a channel saying “hey, checkout is broken again”. Sentifix takes that as a report too — mention it, and the triage comes back in the thread.</p>
+      </div>
+      <div class="intake">
+        <article class="card lane">
+          <span class="lane-h">${GITHUB_ICON} On GitHub</span>
+          <p>Someone opens an issue. Sentifix picks it up from the webhook and replies on the thread with the diagnosis and a patch.</p>
+          <p class="lane-note">Best for reports that already have a stack trace or a reproduction.</p>
+        </article>
+        <article class="card lane">
+          <span class="lane-h">${SLACK_ICON} In Slack</span>
+          <div class="slack-thread">
+            <div class="slack-msg">
+              <span class="slack-who">priya</span>
+              <span>@sentifix discount codes aren't applying on £50 carts</span>
+            </div>
+            <div class="slack-msg slack-reply">
+              <span class="slack-who">Sentifix <span class="badge">app</span></span>
+              <span>Root cause in <code>applyDiscount()</code> — inclusive threshold compared with <code>&gt;</code>. Patch and eval score attached.</span>
+            </div>
+          </div>
+          <p class="lane-note">Best for the reports that would otherwise never become issues at all.</p>
         </article>
       </div>
     </div>
@@ -311,7 +354,7 @@ footer{border-top:1px solid var(--line);padding-block:34px}
           <ul>
             <li>10 repositories</li>
             <li>200 triaged issues each month</li>
-            <li>Slack notifications</li>
+            <li>Slack reporting and replies</li>
             <li>Quality scores on every patch</li>
             <li>Email support</li>
           </ul>
@@ -359,6 +402,10 @@ footer{border-top:1px solid var(--line);padding-block:34px}
         <details>
           <summary>Can I control which issues it responds to?</summary>
           <p>Yes. Run it on everything, restrict it to a single label, or trigger it manually by commenting <code>/sentifix</code> on the issues you want looked at.</p>
+        </details>
+        <details>
+          <summary>What access does the Slack app need?</summary>
+          <p>Three scopes: read the mentions addressed to it, and post messages. It cannot read channel history, browse other conversations, or see anything it wasn't explicitly mentioned in.</p>
         </details>
         <details>
           <summary>How long does setup take?</summary>
