@@ -1,5 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GITHUB_ICON, page } from '../ui/theme';
 
 @Controller()
 export class LandingController {
@@ -14,267 +15,379 @@ export class LandingController {
   @Header('Content-Type', 'text/html; charset=utf-8')
   serve(): string {
     const install = this.installUrl;
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sentifix — bug reports, triaged into pull requests</title>
-  <meta name="description" content="An open-source AI agent that reads your GitHub issues, finds the root cause in your code, and opens a pull request with the fix.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --paper:#f6f2ea; --paper-2:#fdfbf6; --raised:#fffdf9;
-      --ink:#26221c; --ink-soft:#6b655a; --ink-faint:#9c968a;
-      --line:#e7ddcd; --line-soft:#efe8db;
-      --clay:#c96442; --clay-2:#b1543440; --clay-ink:#a24327;
-      --sage:#5c6b52;
-      --shadow:0 1px 2px rgba(60,50,35,.04),0 8px 30px rgba(60,50,35,.06);
-      --serif:'Fraunces',Georgia,'Times New Roman',serif;
-      --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-    }
-    html{scroll-behavior:smooth}
-    body{font-family:var(--sans);background:var(--paper);color:var(--ink);line-height:1.6;-webkit-font-smoothing:antialiased;font-size:17px}
-    a{color:inherit;text-decoration:none}
-    .wrap{max-width:1120px;margin:0 auto;padding:0 32px}
-    .serif{font-family:var(--serif);font-weight:500;letter-spacing:-.01em}
-    .eyebrow{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--clay-ink)}
 
-    /* nav */
-    header{position:sticky;top:0;z-index:20;background:rgba(246,242,234,.8);backdrop-filter:blur(10px);border-bottom:1px solid transparent;transition:border-color .2s}
-    header .bar{display:flex;align-items:center;gap:14px;padding:20px 0}
-    .brand{font-family:var(--serif);font-weight:600;font-size:23px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
-    .brand .dot{width:11px;height:11px;border-radius:50%;background:var(--clay);display:inline-block}
-    nav.links{margin-left:auto;display:flex;gap:30px;align-items:center;font-size:15px;font-weight:450;color:var(--ink-soft)}
-    nav.links a:hover{color:var(--ink)}
-    .btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--sans);font-weight:550;font-size:15px;padding:11px 20px;border-radius:11px;cursor:pointer;transition:.18s;border:1px solid transparent;white-space:nowrap}
-    .btn svg{width:17px;height:17px;fill:currentColor}
-    .btn-primary{background:var(--clay);color:#fff;box-shadow:0 1px 2px rgba(160,67,39,.25)}
-    .btn-primary:hover{background:var(--clay-ink);transform:translateY(-1px)}
-    .btn-outline{background:var(--raised);color:var(--ink);border-color:var(--line)}
-    .btn-outline:hover{border-color:var(--ink-faint)}
-    .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
-    .btn-ghost:hover{background:var(--paper-2)}
-    @media(max-width:820px){nav.links a:not(.navcta){display:none}}
+    return page({
+      title: 'Sentifix — every bug report arrives with a fix attached',
+      description:
+        'An open-source AI agent that reads your GitHub issues, finds the root cause in your code, and replies with a proposed patch.',
+      head: `<style>
+.nav{border-bottom:1px solid var(--line);background:var(--ground)}
+.nav-in{display:flex;align-items:center;gap:28px;height:66px}
+.nav-links{display:none;gap:26px;margin-left:auto}
+.nav-links a{font-size:.9375rem;color:var(--muted);text-decoration:none}
+.nav-links a:hover{color:var(--ink)}
+@media (min-width:860px){.nav-links{display:flex}}
+.nav-cta{margin-left:auto}
+@media (min-width:860px){.nav-cta{margin-left:0}}
 
-    /* hero */
-    .hero{padding:72px 0 40px;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
-    .hero .eyebrow{margin-bottom:22px}
-    .hero h1{font-family:var(--serif);font-weight:500;font-size:60px;line-height:1.04;letter-spacing:-.025em;margin-bottom:22px}
-    .hero h1 em{font-style:italic;color:var(--clay-ink)}
-    .hero p.sub{font-size:19px;color:var(--ink-soft);max-width:30em;margin-bottom:30px}
-    .hero .actions{display:flex;gap:13px;flex-wrap:wrap;align-items:center}
-    .hero .note{margin-top:20px;font-size:14px;color:var(--ink-faint);display:flex;align-items:center;gap:8px}
-    .hero .note b{color:var(--ink-soft);font-weight:550}
+.hero{padding-block:clamp(52px,8vw,92px) clamp(44px,6vw,72px)}
+.hero-grid{display:grid;gap:clamp(40px,5vw,64px);align-items:center}
+@media (min-width:980px){.hero-grid{grid-template-columns:1fr 1.08fr}}
+.hero-copy{display:flex;flex-direction:column;gap:22px;align-items:flex-start}
+.hero-sub{font-size:1.1875rem;color:var(--muted);max-width:46ch}
+.hero-actions{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
 
-    /* product mockup */
-    .mock{position:relative}
-    .card{background:var(--raised);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
-    .mock .issue{padding:18px 20px;position:relative;z-index:2}
-    .mock .win-dots{display:flex;gap:6px;margin-bottom:14px}
-    .mock .win-dots i{width:10px;height:10px;border-radius:50%;background:var(--line);display:block}
-    .mock .tag{display:inline-block;font-size:12px;font-weight:600;color:var(--ink-faint);margin-bottom:7px}
-    .mock .issue h4{font-size:16px;font-weight:600;margin-bottom:5px}
-    .mock .issue .body{font-size:13.5px;color:var(--ink-soft)}
-    .mock .arrow{display:flex;justify-content:center;margin:-6px 0;position:relative;z-index:3}
-    .mock .arrow span{background:var(--clay);color:#fff;font-size:12px;font-weight:600;padding:6px 13px;border-radius:20px;box-shadow:0 4px 14px rgba(160,67,39,.28);display:inline-flex;align-items:center;gap:7px}
-    .mock .report{padding:18px 20px;margin-top:-4px}
-    .mock .rrow{display:flex;align-items:center;gap:10px;margin-bottom:13px}
-    .mock .sev{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#a24327;background:#c9644215;border:1px solid #c9644230;padding:3px 9px;border-radius:6px}
-    .mock .score{margin-left:auto;font-family:var(--serif);font-weight:600;font-size:15px}
-    .mock .bar{height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden;margin-bottom:14px}
-    .mock .bar i{display:block;height:100%;width:92%;background:linear-gradient(90deg,#c96442,#5c6b52);border-radius:4px}
-    .mock .rc{font-size:13px;color:var(--ink-soft);line-height:1.55;margin-bottom:14px}
-    .mock .rc b{color:var(--ink);font-weight:600}
-    .mock .pr{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--sage);background:#5c6b5214;border:1px solid #5c6b5230;padding:7px 13px;border-radius:9px}
-    .mock .float{position:absolute;right:-14px;top:-16px;background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:9px 13px;font-size:12.5px;font-weight:550;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px}
+.trust{margin-top:clamp(40px,5vw,60px);padding-top:26px;border-top:1px solid var(--line)}
+.trust-row{display:flex;flex-wrap:wrap;gap:10px 30px;align-items:center;font-family:var(--mono);font-size:.8125rem;color:var(--muted)}
+.trust-row strong{color:var(--ink);font-weight:600}
 
-    /* sections */
-    section.band{padding:78px 0;border-top:1px solid var(--line-soft)}
-    .sec-head{max-width:34em;margin-bottom:46px}
-    .sec-head h2{font-family:var(--serif);font-weight:500;font-size:38px;line-height:1.1;letter-spacing:-.02em;margin:12px 0 0}
-    .sec-head p{color:var(--ink-soft);margin-top:14px;font-size:17px}
+.mock{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;font-size:.875rem}
+.mock-bar{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid var(--line);background:var(--sunk)}
+.mock-dot{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.mock-path{font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-left:6px}
+.mock-body{padding:18px 18px 20px;display:flex;flex-direction:column;gap:14px}
+.issue-title{font-weight:600;font-size:1rem;line-height:1.35}
+.issue-meta{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.comment{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.comment-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 13px;background:var(--accent-wash);border-bottom:1px solid var(--line)}
+.avatar{width:20px;height:20px;border-radius:5px;background:var(--accent);display:grid;place-items:center;color:#FFF;font-family:var(--mono);font-size:.625rem;font-weight:700;flex:none}
+.who{font-weight:600;font-size:.8125rem}
+.badge{font-family:var(--mono);font-size:.625rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.comment-body{padding:13px;display:flex;flex-direction:column;gap:11px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip-hot{background:var(--del-wash);color:var(--del);border-color:transparent}
+.finding{font-size:.8125rem;line-height:1.55}
+.finding code{font-size:.78125rem;background:var(--sunk);padding:1px 5px;border-radius:4px}
+.diff{border:1px solid var(--line);border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:.75rem;line-height:1.75}
+.diff-head{padding:6px 11px;background:var(--sunk);color:var(--muted);border-bottom:1px solid var(--line);font-size:.6875rem}
+.diff-scroll{overflow-x:auto}
+.diff-row{display:flex;gap:12px;padding:0 11px;white-space:pre}
+.diff-row .n{color:var(--muted);opacity:.6;user-select:none;min-width:1.6em;text-align:right}
+.d-add{background:var(--add-wash);color:var(--add)}
+.d-del{background:var(--del-wash);color:var(--del)}
+.verdict{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:.6875rem;color:var(--muted)}
+.tick{color:var(--add);font-weight:700}
 
-    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
-    .steps .step{padding:26px 26px 26px 0;border-left:1px solid var(--line);padding-left:26px}
-    .steps .step:first-child{border-left:none;padding-left:0}
-    .steps .num{font-family:var(--serif);font-size:15px;color:var(--clay-ink);font-weight:600;margin-bottom:12px}
-    .steps .step h3{font-size:17px;font-weight:600;margin-bottom:7px}
-    .steps .step p{font-size:15px;color:var(--ink-soft)}
+.band{padding-block:clamp(60px,8vw,96px);border-top:1px solid var(--line)}
+.band-head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(36px,4vw,52px)}
+.cards{display:grid;gap:22px}
+@media (min-width:760px){.cards{grid-template-columns:repeat(3,1fr)}}
+.cards .card{padding:26px 24px 28px;display:flex;flex-direction:column;gap:12px}
+.cards .card p{color:var(--muted);font-size:.9375rem}
+.ico{width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.6}
 
-    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-    .tile{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;padding:26px}
-    .tile .ic{width:42px;height:42px;border-radius:11px;background:#c9644214;display:flex;align-items:center;justify-content:center;margin-bottom:16px}
-    .tile .ic svg{width:21px;height:21px;fill:none;stroke:var(--clay);stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
-    .tile h3{font-size:16px;font-weight:600;margin-bottom:6px}
-    .tile p{font-size:14.5px;color:var(--ink-soft)}
+.steps{display:grid;gap:2px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+@media (min-width:860px){.steps{grid-template-columns:repeat(3,1fr)}}
+.step{background:var(--surface);padding:28px 24px 30px;display:flex;flex-direction:column;gap:11px}
+.step-n{font-family:var(--mono);font-size:.6875rem;font-weight:700;letter-spacing:.1em;color:var(--accent-text)}
+.step p{color:var(--muted);font-size:.9375rem}
 
-    .chan{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-    .chan .box{background:var(--paper-2);border:1px solid var(--line);border-radius:18px;padding:30px}
-    .chan .box .ic{margin-bottom:16px;height:34px;display:flex;align-items:center}
-    .chan .box .ic svg{height:32px;width:auto}
-    .chan .box h3{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:8px}
-    .chan .box p{font-size:15px;color:var(--ink-soft);margin-bottom:18px}
-    .chan code{background:var(--paper);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+.quote-grid{display:grid;gap:22px}
+@media (min-width:860px){.quote-grid{grid-template-columns:1.25fr 1fr}}
+.quote{display:flex;flex-direction:column;gap:18px;padding:30px 28px}
+.quote blockquote{font-size:1.125rem;line-height:1.55}
+.quote figcaption{font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.stat-stack{display:grid;gap:22px;align-content:start}
+.stat{padding:22px 24px}
+.stat-n{font-family:var(--mono);font-size:2rem;font-weight:600;letter-spacing:-.03em;color:var(--accent-text);font-variant-numeric:tabular-nums;display:block}
+.stat-l{font-size:.875rem;color:var(--muted)}
 
-    /* closing cta */
-    .cta{margin:78px 0;background:linear-gradient(160deg,#2c2620,#3a322a);color:#f6f2ea;border-radius:26px;padding:64px 40px;text-align:center;position:relative;overflow:hidden}
-    .cta::after{content:"";position:absolute;right:-60px;bottom:-80px;width:280px;height:280px;background:radial-gradient(circle,rgba(201,100,66,.35),transparent 70%);pointer-events:none}
-    .cta h2{font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.08;letter-spacing:-.02em;margin-bottom:14px}
-    .cta p{color:#d8cfc0;margin-bottom:28px;font-size:17px}
-    .cta .actions{display:flex;gap:13px;justify-content:center;flex-wrap:wrap}
-    .cta .btn-primary{background:var(--clay)}
-    .cta .btn-ghost{background:transparent;border-color:#5a5147;color:#f6f2ea}
-    .cta .btn-ghost:hover{background:rgba(255,255,255,.06)}
+.tiers{display:grid;gap:22px;align-items:start}
+@media (min-width:880px){.tiers{grid-template-columns:repeat(3,1fr)}}
+.tier{padding:28px 26px 30px;display:flex;flex-direction:column;gap:18px}
+.tier-featured{border-color:var(--accent);box-shadow:var(--shadow)}
+.tier-name{display:flex;align-items:center;gap:10px}
+.tag{font-family:var(--mono);font-size:.625rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#FFF;background:var(--accent);padding:3px 8px;border-radius:4px}
+.price{font-family:var(--mono);font-size:2.25rem;font-weight:600;letter-spacing:-.035em}
+.price span{font-size:.875rem;font-weight:500;color:var(--muted);letter-spacing:0}
+.tier ul{list-style:none;display:grid;gap:10px;font-size:.9375rem}
+.tier li{display:flex;gap:10px;color:var(--muted)}
+.tier li::before{content:"+";font-family:var(--mono);color:var(--add);font-weight:700;flex:none}
+.tier .lede{font-size:.9375rem}
 
-    footer{border-top:1px solid var(--line-soft);padding:34px 0 60px;color:var(--ink-faint);font-size:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
-    footer .brand{font-size:18px;color:var(--ink)}
-    footer .sp{margin-left:auto}
+.faq{display:grid;border-top:1px solid var(--line);max-width:76ch}
+details{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;list-style:none;padding:20px 34px 20px 0;position:relative;font-weight:600;font-size:1.0625rem;letter-spacing:-.01em}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";position:absolute;right:4px;top:18px;font-family:var(--mono);font-size:1.25rem;font-weight:400;color:var(--accent)}
+details[open] summary::after{content:"\\2212"}
+details p{padding-bottom:22px;color:var(--muted);max-width:68ch}
 
-    @media(max-width:900px){
-      .hero{grid-template-columns:1fr;gap:44px;padding:48px 0 20px}
-      .hero h1{font-size:44px}
-      .steps,.grid3,.chan{grid-template-columns:1fr}
-      .steps .step{border-left:none;padding-left:0;border-top:1px solid var(--line);padding-top:22px}
-      .steps .step:first-child{border-top:none;padding-top:0}
-      .sec-head h2,.cta h2{font-size:31px}
-      .wrap{padding:0 22px}
-    }
-  </style>
-</head>
-<body>
-  <header id="top">
-    <div class="wrap bar">
-      <a class="brand" href="#top"><span class="dot"></span>Sentifix</a>
-      <nav class="links">
-        <a href="#how">How it works</a>
-        <a href="#features">Features</a>
-        <a href="#channels">Integrations</a>
-        <a href="https://github.com/Akshat171/Sentifix" target="_blank" rel="noopener">GitHub</a>
-        <a class="btn btn-primary navcta" href="${install}">Add to GitHub</a>
-      </nav>
-    </div>
-  </header>
+.cta-band{border-top:1px solid var(--line);padding-block:clamp(60px,8vw,92px);background:var(--sunk)}
+.cta-in{display:flex;flex-direction:column;gap:22px;align-items:flex-start}
+@media (min-width:820px){.cta-in{flex-direction:row;align-items:center;justify-content:space-between;gap:40px}}
+footer{border-top:1px solid var(--line);padding-block:34px}
+.foot{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:center;font-size:.875rem;color:var(--muted)}
+.foot a{text-decoration:none}
+.foot a:hover{color:var(--ink)}
+.foot-end{margin-left:auto;font-family:var(--mono);font-size:.75rem}
 
-  <main class="wrap">
-    <!-- HERO -->
-    <section class="hero">
-      <div>
-        <div class="eyebrow">Open-source AI bug triage</div>
-        <h1 class="serif">Your bug reports,<br>triaged into <em>pull requests</em>.</h1>
-        <p class="sub">Sentifix reads every incoming GitHub issue, finds the root cause in your codebase, and opens a pull request with the fix — before an engineer even opens the tab.</p>
-        <div class="actions">
-          <a class="btn btn-primary" href="${install}">
-            <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            Add to GitHub
-          </a>
-          <a class="btn btn-outline" href="https://github.com/Akshat171/Sentifix" target="_blank" rel="noopener">Star on GitHub ★</a>
+@media (prefers-reduced-motion:no-preference){
+  .rise{animation:rise .5s cubic-bezier(.2,.7,.3,1) backwards}
+  .rise:nth-child(2){animation-delay:.06s}
+  .mock{animation:rise .6s .1s cubic-bezier(.2,.7,.3,1) backwards}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}}
+}
+</style>`,
+      body: `
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="/dashboard">Dashboard</a>
+    </nav>
+    <a class="btn btn-outline nav-cta" href="${install}">Install on GitHub</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="label rise">Open-source issue triage</span>
+        <h1 class="rise">Every bug report arrives with a fix attached.</h1>
+        <p class="hero-sub rise">Sentifix reads each new GitHub issue, traces it back to the code that caused it, and replies with a root cause and a working patch — usually within 30 seconds of the issue being opened.</p>
+        <div class="hero-actions rise">
+          <a class="btn btn-primary" href="${install}">${GITHUB_ICON} Install on GitHub</a>
+          <a class="btn btn-quiet" href="#example">See a real triage</a>
         </div>
-        <div class="note"><b>No infra, no config.</b> Install the app, pick your repos — you review and merge.</div>
       </div>
 
-      <!-- product mockup -->
-      <div class="mock">
-        <div class="float"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c96442" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg> <span>Triaged in ~30s</span></div>
-        <div class="card issue">
-          <div class="win-dots"><i></i><i></i><i></i></div>
-          <div class="tag">ISSUE #128 · opened</div>
-          <h4>Login fails silently on mobile Safari</h4>
-          <div class="body">Tapping “Sign in” does nothing. No error shown. Works on desktop.</div>
+      <div class="mock" role="img" aria-label="A GitHub issue thread where Sentifix has replied with a root-cause diagnosis and a proposed code patch.">
+        <div class="mock-bar">
+          <span class="mock-dot" aria-hidden="true"></span><span class="mock-dot" aria-hidden="true"></span><span class="mock-dot" aria-hidden="true"></span>
+          <span class="mock-path">acme/checkout · issue #482</span>
         </div>
-        <div class="arrow"><span>↓ Sentifix analyzing</span></div>
-        <div class="card report">
-          <div class="rrow">
-            <span class="sev">● High · Auth</span>
-            <span class="score">0.94</span>
+        <div class="mock-body">
+          <p class="issue-title">Discount codes silently ignored when cart total is exactly £50</p>
+          <p class="issue-meta">opened 31 seconds ago by @priyawrites · 1 comment</p>
+          <div class="comment">
+            <div class="comment-head">
+              <span class="avatar" aria-hidden="true">S</span>
+              <span class="who">sentifix</span>
+              <span class="badge">bot</span>
+              <span class="badge">triaged in 24s</span>
+            </div>
+            <div class="comment-body">
+              <div class="chips">
+                <span class="chip chip-hot">severity: high</span>
+                <span class="chip">pricing</span>
+                <span class="chip">regression</span>
+              </div>
+              <p class="finding"><strong>Root cause.</strong> The eligibility check in <code>applyDiscount()</code> uses <code>&gt;</code> where the threshold is meant to be inclusive, so a cart at exactly the minimum is rejected.</p>
+              <div class="diff">
+                <div class="diff-head">src/pricing/discount.ts</div>
+                <div class="diff-scroll">
+                  <div class="diff-row"><span class="n">41</span><span>  const threshold = rule.minSubtotal;</span></div>
+                  <div class="diff-row d-del"><span class="n">42</span><span>- if (subtotal &gt; threshold) {</span></div>
+                  <div class="diff-row d-add"><span class="n">42</span><span>+ if (subtotal &gt;= threshold) {</span></div>
+                  <div class="diff-row"><span class="n">43</span><span>    return applyRule(rule, subtotal);</span></div>
+                </div>
+              </div>
+              <p class="verdict"><span class="tick" aria-hidden="true">&#10003;</span> Patch reviewed and scored before posting · 3 related tests found</p>
+            </div>
           </div>
-          <div class="bar"><i></i></div>
-          <div class="rc"><b>Root cause:</b> the tap handler isn’t bound to <code style="font-size:12px">touchend</code>, so <code style="font-size:12px">onClick</code> never fires in mobile Safari’s auth flow.</div>
-          <span class="pr"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg> Pull request #129 opened →</span>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- HOW -->
-    <section class="band" id="how">
-      <div class="sec-head">
-        <div class="eyebrow">How it works</div>
-        <h2 class="serif">From “it’s broken” to a reviewable diff.</h2>
-        <p>Every issue runs through the same grounded pipeline — no guesswork, and a quality score before it reaches you.</p>
+    <div class="wrap trust">
+      <div class="trust-row">
+        <span><strong>MIT licensed</strong> — read every line</span>
+        <span><strong>Self-host it</strong> — your code never leaves your infra</span>
+        <span><strong>GitHub App</strong> + Slack</span>
+        <span><strong>Runs in ~30s</strong> per issue</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="example">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">Why teams turn it on</span>
+        <h2>Your backlog stops growing faster than you can read it.</h2>
+        <p class="lede">Triage is the tax on every popular repository. Sentifix pays it for you, and shows its work.</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h10" stroke-linecap="round"/><circle cx="19" cy="18" r="3"/></svg>
+          <h3>Know what matters before you open the tab</h3>
+          <p>Every issue arrives labelled with severity, category, and the components it touches — so the queue sorts itself and the urgent things surface first.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h9l7 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M13 4v7h7" stroke-linecap="round"/><path d="M8 15h6" stroke-linecap="round"/></svg>
+          <h3>Skip the hour spent finding the right file</h3>
+          <p>Sentifix indexes your repository and searches it the way a reviewer would — following stack traces and imports, not just matching words — then names the exact lines at fault.</p>
+        </article>
+        <article class="card">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12" stroke-linecap="round"/><path d="m7 10 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
+          <h3>Start from a patch, not a blank editor</h3>
+          <p>You get a real unified diff you can read, argue with, or apply. Nothing is ever pushed or merged — the change stays a suggestion until a human says otherwise.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">How it works</span>
+        <h2>Three steps, and none of them are yours.</h2>
+        <p class="lede">Install once. Everything after that happens on its own, in the open, in the issue thread.</p>
       </div>
       <div class="steps">
-        <div class="step"><div class="num">01</div><h3>Understand</h3><p>Classifies severity and category, then retrieves the exact code involved with hybrid semantic + keyword search over your repo.</p></div>
-        <div class="step"><div class="num">02</div><h3>Diagnose &amp; fix</h3><p>Reasons about the root cause and writes a minimal, multi-file unified diff grounded in your actual code.</p></div>
-        <div class="step"><div class="num">03</div><h3>Score &amp; ship</h3><p>An LLM judge scores the fix, then Sentifix comments on the issue and opens a pull request for you to review.</p></div>
+        <article class="step">
+          <span class="step-n">STEP 01</span>
+          <h3>An issue is opened</h3>
+          <p>Sentifix picks it up from the webhook and classifies it — what kind of bug, how severe, which parts of the system it touches.</p>
+        </article>
+        <article class="step">
+          <span class="step-n">STEP 02</span>
+          <h3>It reads your code</h3>
+          <p>It searches the indexed repository for the code the report points at, pulls in the surrounding context, and works out the root cause.</p>
+        </article>
+        <article class="step">
+          <span class="step-n">STEP 03</span>
+          <h3>It posts a fix</h3>
+          <p>A comment lands on the issue with the diagnosis and a proposed diff — already scored for correctness and safety before you ever see it.</p>
+        </article>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- FEATURES -->
-    <section class="band" id="features">
-      <div class="sec-head">
-        <div class="eyebrow">What’s in the box</div>
-        <h2 class="serif">Everything from issue to merge.</h2>
+  <section class="band">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">Built to be checked</span>
+        <h2>Every patch is graded before it reaches you.</h2>
+        <p class="lede">An AI that guesses confidently is worse than no AI at all. So Sentifix scores its own output against the issue it was given, and that score ships with the suggestion.</p>
       </div>
-      <div class="grid3">
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div><h3>Grounded RAG</h3><p>Hybrid BM25 + vector search keeps every fix tied to your real code — not a hallucination.</p></div>
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" x2="6" y1="9" y2="21"/></svg></div><h3>Automatic PRs</h3><p>Applies the diff to a fresh branch and opens a pull request you review like any other.</p></div>
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg></div><h3>Scored by a judge</h3><p>Correctness, completeness, safety and clarity — rated before the fix reaches you.</p></div>
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Multi-tenant &amp; private</h3><p>Per-installation isolation. Your code is scoped to your org, never shared across tenants.</p></div>
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></div><h3>You stay in control</h3><p>Trigger on every issue, a label, or an explicit <code style="font-size:12px">/sentifix</code> — with a daily cap.</p></div>
-        <div class="tile"><div class="ic"><svg viewBox="0 0 24 24"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg></div><h3>Open source</h3><p>MIT licensed. Self-host it, read every line, extend the pipeline to fit your stack.</p></div>
-      </div>
-    </section>
-
-    <!-- CHANNELS -->
-    <section class="band" id="channels">
-      <div class="sec-head">
-        <div class="eyebrow">Where it works</div>
-        <h2 class="serif">Meets your team where bugs land.</h2>
-      </div>
-      <div class="chan">
-        <div class="box">
-          <div class="ic"><svg viewBox="0 0 16 16" style="fill:var(--ink);stroke:none"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 014 0c1.53-1.03 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></div>
-          <h3>GitHub</h3>
-          <p>Open an issue, or comment <code>/sentifix</code> on any existing one. The triage and a ready-to-review pull request land right on the issue.</p>
-          <a class="btn btn-primary" href="${install}">Add to GitHub</a>
+      <div class="quote-grid">
+        <figure class="card quote">
+          <blockquote>“Replace this with a real quote once you have one — a maintainer describing what triage cost them before, and what it costs now.”</blockquote>
+          <figcaption>Placeholder — swap in a real name, role, and repository</figcaption>
+        </figure>
+        <div class="stat-stack">
+          <div class="card stat">
+            <span class="stat-n">3</span>
+            <span class="stat-l">independent scores on every patch — correctness, completeness, and safety</span>
+          </div>
+          <div class="card stat">
+            <span class="stat-n">0</span>
+            <span class="stat-l">commits pushed without a human approving them first</span>
+          </div>
         </div>
-        <div class="box">
-          <div class="ic"><svg viewBox="0 0 122.8 122.8" style="stroke:none"><path d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9z" fill="#e01e5a"/><path d="M32.3 77.6c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z" fill="#e01e5a"/><path d="M45.2 25.8c-7.1 0-12.9-5.8-12.9-12.9S38.1 0 45.2 0s12.9 5.8 12.9 12.9v12.9H45.2z" fill="#36c5f0"/><path d="M45.2 32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H12.9C5.8 58.1 0 52.3 0 45.2s5.8-12.9 12.9-12.9h32.3z" fill="#36c5f0"/><path d="M97 45.2c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9-5.8 12.9-12.9 12.9H97V45.2z" fill="#2eb67d"/><path d="M90.5 45.2c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V12.9C64.7 5.8 70.5 0 77.6 0s12.9 5.8 12.9 12.9v32.3z" fill="#2eb67d"/><path d="M77.6 97c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9-12.9-5.8-12.9-12.9V97h12.9z" fill="#ecb22e"/><path d="M77.6 90.5c-7.1 0-12.9-5.8-12.9-12.9s5.8-12.9 12.9-12.9h32.3c7.1 0 12.9 5.8 12.9 12.9s-5.8 12.9-12.9 12.9H77.6z" fill="#ecb22e"/></svg></div>
-          <h3>Slack</h3>
-          <p>Tag <strong>@Sentifix</strong> in any channel with an error or stack trace. It replies in-thread with the root cause, a diff preview, and a link to the PR.</p>
-          <a class="btn btn-ghost" href="/slack/install">Add to Slack</a>
-        </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- CLOSING CTA -->
-    <section class="cta">
-      <h2 class="serif">Stop triaging. Start merging.</h2>
-      <p>Free and open source. Install the app, point it at a repo, and let the pull requests come to you.</p>
-      <div class="actions">
-        <a class="btn btn-primary" href="${install}">Add to GitHub</a>
-        <a class="btn btn-ghost" href="https://github.com/Akshat171/Sentifix" target="_blank" rel="noopener">Read the docs</a>
+  <section class="band" id="pricing">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">Pricing</span>
+        <h2>Free if you host it. Cheap if you don't.</h2>
+        <p class="lede">The whole thing is open source. Paying is for people who would rather not run a queue, a database, and a vector store themselves.</p>
       </div>
-    </section>
-  </main>
+      <div class="tiers">
+        <article class="card tier">
+          <div class="tier-name"><h3>Self-hosted</h3></div>
+          <p class="price">£0</p>
+          <p class="lede">Run it on your own box with your own API keys.</p>
+          <ul>
+            <li>Unlimited repositories</li>
+            <li>Unlimited triage runs</li>
+            <li>Docker Compose, one command</li>
+            <li>Community support</li>
+          </ul>
+          <a class="btn btn-outline" href="https://github.com/Akshat171/Sentifix">Read the docs</a>
+        </article>
+        <article class="card tier tier-featured">
+          <div class="tier-name"><h3>Team</h3><span class="tag">Most teams</span></div>
+          <p class="price">£49<span> / month</span></p>
+          <p class="lede">Hosted, maintained, and watching your repos.</p>
+          <ul>
+            <li>10 repositories</li>
+            <li>200 triaged issues each month</li>
+            <li>Slack notifications</li>
+            <li>Quality scores on every patch</li>
+            <li>Email support</li>
+          </ul>
+          <a class="btn btn-primary" href="${install}">Start free trial</a>
+        </article>
+        <article class="card tier">
+          <div class="tier-name"><h3>Scale</h3></div>
+          <p class="price">Talk to us</p>
+          <p class="lede">For busy monorepos and larger organisations.</p>
+          <ul>
+            <li>Unlimited repositories</li>
+            <li>Volume triage pricing</li>
+            <li>Private deployment in your account</li>
+            <li>Priority support</li>
+          </ul>
+          <a class="btn btn-outline" href="${install}">Get in touch</a>
+        </article>
+      </div>
+    </div>
+  </section>
 
-  <footer class="wrap">
-    <span class="brand"><span class="dot" style="width:9px;height:9px;background:var(--clay);border-radius:50%;display:inline-block;margin-right:7px"></span>Sentifix</span>
-    <span>MIT licensed · Built with NestJS, LangGraph &amp; pgvector</span>
-    <span class="sp"></span>
-    <a href="https://github.com/Akshat171/Sentifix" target="_blank" rel="noopener">GitHub</a>
+  <section class="band" id="faq">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">Questions</span>
+        <h2>The things people ask first.</h2>
+      </div>
+      <div class="faq">
+        <details>
+          <summary>Does it push code to my repository?</summary>
+          <p>No. Sentifix writes a comment containing a proposed diff. Applying it, editing it, or ignoring it is entirely your call — nothing reaches a branch until you approve it from the dashboard.</p>
+        </details>
+        <details>
+          <summary>Where does my source code go?</summary>
+          <p>If you self-host, nowhere — the index lives in your own database on your own infrastructure. On the hosted plan, your repository is indexed on our servers and used only to answer issues in that repository.</p>
+        </details>
+        <details>
+          <summary>Which languages does it work with?</summary>
+          <p>Any language in your repository can be indexed and searched. Patch quality is strongest where the codebase has clear structure and the issue includes a stack trace or a reproduction.</p>
+        </details>
+        <details>
+          <summary>What if the suggested fix is wrong?</summary>
+          <p>Sometimes it will be. That's why every patch is scored before posting and nothing is applied automatically. Treat a Sentifix comment as a well-prepared first draft from a reviewer who has already read the code.</p>
+        </details>
+        <details>
+          <summary>Can I control which issues it responds to?</summary>
+          <p>Yes. Run it on everything, restrict it to a single label, or trigger it manually by commenting <code>/sentifix</code> on the issues you want looked at.</p>
+        </details>
+        <details>
+          <summary>How long does setup take?</summary>
+          <p>Install the GitHub App, pick your repositories, and the first index runs immediately. Most teams see their first triaged issue within a few minutes.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-band">
+    <div class="wrap cta-in">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <h2>Point it at one noisy repository.</h2>
+        <p class="lede">Free to try, no card, and you can uninstall it in two clicks if it isn't pulling its weight.</p>
+      </div>
+      <a class="btn btn-primary" href="${install}">${GITHUB_ICON} Install on GitHub</a>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <a class="brand" href="#top" style="font-size:.9375rem"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <a href="https://github.com/Akshat171/Sentifix">Source</a>
+    <a href="/setup">Setup</a>
     <a href="/dashboard">Dashboard</a>
-  </footer>
-
-  <script>
-    // subtle nav border once scrolled
-    const h=document.querySelector('header');
-    addEventListener('scroll',()=>h.style.borderBottomColor=scrollY>8?'var(--line)':'transparent',{passive:true});
-  </script>
-</body>
-</html>`;
+    <span class="foot-end">MIT licensed · sentifix.dev</span>
+  </div>
+</footer>`,
+    });
   }
 }
