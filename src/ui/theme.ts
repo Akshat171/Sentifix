@@ -25,8 +25,23 @@ export interface PageOptions {
   fullHeight?: boolean;
 }
 
-/** Wordmark used across all surfaces. Replaces the old emoji logos. */
-export const BRAND_MARK = `<span class="brand-dot" aria-hidden="true"></span>`;
+/**
+ * The Sentifix mark: an unresolved report (the dot) becoming a resolved one
+ * (the check). Inline SVG rather than a raster asset so it stays sharp at any
+ * size, needs no extra request, and can be reused as the favicon below.
+ */
+export const BRAND_MARK = `<svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="sfx-mark" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#C2643F"/><stop offset="1" stop-color="#9E3A22"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#sfx-mark)"/><circle cx="15" cy="35" r="5.5" fill="#F7F1E8" opacity=".6"/><path d="M15 35l13 10 21-25" fill="none" stroke="#F9F4EC" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/** Same mark, URL-encoded for the <link rel="icon"> data URI. */
+const FAVICON =
+  `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E` +
+  `%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='.3' y2='1'%3E` +
+  `%3Cstop offset='0' stop-color='%23C2643F'/%3E%3Cstop offset='1' stop-color='%239E3A22'/%3E` +
+  `%3C/linearGradient%3E%3C/defs%3E` +
+  `%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E` +
+  `%3Ccircle cx='15' cy='35' r='5.5' fill='%23F7F1E8' opacity='.6'/%3E` +
+  `%3Cpath d='M15 35l13 10 21-25' fill='none' stroke='%23F9F4EC' stroke-width='7' ` +
+  `stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E`;
 
 export const GITHUB_ICON = `<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="17" height="17"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>`;
 
@@ -91,7 +106,8 @@ code,pre,.mono{font-family:var(--mono)}
   font-family:var(--mono);font-weight:700;font-size:1.0625rem;letter-spacing:-.02em;
   text-decoration:none;display:inline-flex;align-items:center;gap:9px;color:var(--ink);
 }
-.brand-dot{width:9px;height:9px;border-radius:2px;background:var(--accent);flex:none}
+.brand-mark{width:22px;height:22px;border-radius:5px;flex:none;display:block}
+.brand-mark-lg{width:44px;height:44px;border-radius:10px}
 
 .btn{
   display:inline-flex;align-items:center;gap:9px;
@@ -131,6 +147,8 @@ export function page(o: PageOptions): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
 <title>${o.title}</title>
+<link rel="icon" href="${FAVICON}">
+<link rel="apple-touch-icon" href="${FAVICON}">
 ${o.description ? `<meta name="description" content="${o.description}">` : ''}
 <style>${THEME_CSS}</style>
 ${o.head ?? ''}

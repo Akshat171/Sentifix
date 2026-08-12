@@ -5,7 +5,7 @@ import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { In, Repository } from 'typeorm';
 import { SessionService } from '../auth/session.service';
 import { Installation } from '../persistence/entities/installation.entity';
-import { GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
+import { BRAND_MARK, GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
 
 @Controller('setup')
 export class SetupController {
@@ -97,7 +97,7 @@ body{display:flex;flex-direction:column;align-items:center;padding:48px 20px}
       body: `
 <div class="panel">
   <div class="head">
-    <a class="brand" href="/"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <a class="brand" href="/">${BRAND_MARK}Sentifix</a>
     <h1>Connect a repository.</h1>
     <p class="lede">Install the GitHub App and Sentifix starts triaging new issues — root cause and a proposed patch, usually within 30 seconds.</p>
     <div class="actions">

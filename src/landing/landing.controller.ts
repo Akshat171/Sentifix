@@ -1,6 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
+import { BRAND_MARK, GITHUB_ICON, SLACK_ICON, page } from '../ui/theme';
 
 @Controller()
 export class LandingController {
@@ -144,7 +144,7 @@ footer{border-top:1px solid var(--line);padding-block:34px}
       body: `
 <header class="nav">
   <div class="wrap nav-in">
-    <a class="brand" href="#top"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <a class="brand" href="#top">${BRAND_MARK}Sentifix</a>
     <nav class="nav-links" aria-label="Main">
       <a href="#how">How it works</a>
       <a href="#pricing">Pricing</a>
@@ -428,7 +428,7 @@ footer{border-top:1px solid var(--line);padding-block:34px}
 
 <footer>
   <div class="wrap foot">
-    <a class="brand" href="#top" style="font-size:.9375rem"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <a class="brand" href="#top" style="font-size:.9375rem">${BRAND_MARK}Sentifix</a>
     <a href="https://github.com/Akshat171/Sentifix">Source</a>
     <a href="/setup">Setup</a>
     <a href="/dashboard">Dashboard</a>

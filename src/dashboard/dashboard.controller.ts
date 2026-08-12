@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { page } from '../ui/theme';
+import { BRAND_MARK, page } from '../ui/theme';
 
 @Controller('dashboard')
 export class DashboardController {
@@ -104,7 +104,7 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 </style>`,
       body: `
   <header>
-    <a class="brand" href="/"><span class="brand-dot" aria-hidden="true"></span>Sentifix</a>
+    <a class="brand" href="/">${BRAND_MARK}Sentifix</a>
     <span class="tagline">Triage</span>
     ${userBadge}
     <button class="refresh-btn" onclick="loadIssues()">Refresh</button>
