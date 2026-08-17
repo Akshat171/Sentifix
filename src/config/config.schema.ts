@@ -9,6 +9,24 @@ export const configSchema = Joi.object({
   DB_SYNCHRONIZE: Joi.boolean().default(false),
   REDIS_URL: Joi.string().uri().optional(),
   RABBITMQ_URL: Joi.string().uri().required(),
+  // Which vendor serves chat/completions. Embeddings always use OpenAI — Anthropic
+  // ships no embedding model — so OPENAI_API_KEY stays required either way.
+  LLM_PROVIDER: Joi.string().valid('openai', 'bedrock').default('openai'),
+  // Claude on Amazon Bedrock. Credentials resolve through the standard AWS chain
+  // (instance role on EC2), so there is no key to set here. Model IDs carry the
+  // `anthropic.` prefix, and access must be granted per-region in the Bedrock console.
+  AWS_REGION: Joi.string().when('LLM_PROVIDER', {
+    is: 'bedrock',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  BEDROCK_CHAT_MODEL: Joi.string().default('anthropic.claude-sonnet-5'),
+  // Kept stronger than BEDROCK_CHAT_MODEL for the same reason as the OpenAI pair below.
+  BEDROCK_JUDGE_MODEL: Joi.string().default('anthropic.claude-opus-5'),
+  BEDROCK_RERANK_MODEL: Joi.string().optional(), // defaults to BEDROCK_CHAT_MODEL
+  // Claude requires an explicit output ceiling, and on Opus-tier models thinking
+  // shares this budget with the response — leave headroom or JSON replies truncate.
+  BEDROCK_MAX_TOKENS: Joi.number().default(16000),
   OPENAI_API_KEY: Joi.string().required(),
   OPENAI_CHAT_MODEL: Joi.string().default('gpt-4o-mini'),
   // Model used by the LLM-as-judge eval. Defaults to a different, stronger model
@@ -38,18 +56,18 @@ export const configSchema = Joi.object({
   // signed-in user's installations. Off (default) = open single-tenant self-host.
   // When on, needs SESSION_SECRET, APP_BASE_URL, and GITHUB_APP_CLIENT_ID/SECRET.
   DASHBOARD_AUTH: Joi.boolean().default(false),
-  SESSION_SECRET: Joi.string().optional(),   // HMAC secret for signing the session cookie
+  SESSION_SECRET: Joi.string().optional(), // HMAC secret for signing the session cookie
   APP_BASE_URL: Joi.string().uri().optional(), // public base URL, e.g. https://sentifix.dev
   // GitHub App (optional — enables one-click install flow)
   GITHUB_APP_ID: Joi.number().optional(),
   GITHUB_APP_PRIVATE_KEY: Joi.string().optional(), // PEM with \n escaped as \\n
-  GITHUB_APP_SLUG: Joi.string().optional(),        // e.g. "sentifix-bot"
+  GITHUB_APP_SLUG: Joi.string().optional(), // e.g. "sentifix-bot"
   GITHUB_APP_CLIENT_ID: Joi.string().optional(),
   GITHUB_APP_CLIENT_SECRET: Joi.string().optional(),
   // Slack integration
-  SLACK_BOT_TOKEN: Joi.string().optional(),       // xoxb-... (legacy single-workspace fallback)
-  SLACK_SIGNING_SECRET: Joi.string().optional(),  // per-app; verifies all inbound requests
-  SLACK_DEFAULT_REPO: Joi.string().optional(),    // global fallback owner/repo when not detectable
+  SLACK_BOT_TOKEN: Joi.string().optional(), // xoxb-... (legacy single-workspace fallback)
+  SLACK_SIGNING_SECRET: Joi.string().optional(), // per-app; verifies all inbound requests
+  SLACK_DEFAULT_REPO: Joi.string().optional(), // global fallback owner/repo when not detectable
   // Slack OAuth (multi-tenant "Add to Slack" — each workspace installs & we store its bot token)
   SLACK_CLIENT_ID: Joi.string().optional(),
   SLACK_CLIENT_SECRET: Joi.string().optional(),

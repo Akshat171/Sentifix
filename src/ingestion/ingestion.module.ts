@@ -10,7 +10,12 @@ import { IngestionController } from './ingestion.controller';
 import { IngestionService } from './ingestion.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Issue, Installation, InstallationRepository]), QueueModule, GithubModule, IndexingModule],
+  imports: [
+    TypeOrmModule.forFeature([Issue, Installation, InstallationRepository]),
+    QueueModule,
+    GithubModule,
+    IndexingModule,
+  ],
   controllers: [IngestionController],
   providers: [IngestionService],
 })

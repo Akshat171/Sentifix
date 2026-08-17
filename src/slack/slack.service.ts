@@ -23,7 +23,10 @@ export interface SlackTriagePayload {
 }
 
 const SEV_EMOJI: Record<string, string> = {
-  critical: '🔴', high: '🟠', medium: '🟡', low: '🟢',
+  critical: '🔴',
+  high: '🟠',
+  medium: '🟡',
+  low: '🟢',
 };
 
 @Injectable()
@@ -55,7 +58,11 @@ export class SlackService {
     return inst?.defaultRepo ?? null;
   }
 
-  async postPlaceholder(channel: string, threadTs: string, teamId?: string): Promise<string | null> {
+  async postPlaceholder(
+    channel: string,
+    threadTs: string,
+    teamId?: string,
+  ): Promise<string | null> {
     const client = await this.getClient(teamId);
     if (!client) return null;
     try {
@@ -81,7 +88,12 @@ export class SlackService {
   }
 
   /** Post a plain text message in a thread (used for quota/limit notices). */
-  async postNotice(channel: string, threadTs: string, teamId: string | undefined, text: string): Promise<void> {
+  async postNotice(
+    channel: string,
+    threadTs: string,
+    teamId: string | undefined,
+    text: string,
+  ): Promise<void> {
     const client = await this.getClient(teamId);
     if (!client) return;
     try {
@@ -95,15 +107,24 @@ export class SlackService {
     const client = await this.getClient(payload.teamId);
     if (!client) return;
 
-    const cls = payload.classification as { severity?: string; category?: string; affectedComponents?: string[] };
+    const cls = payload.classification as {
+      severity?: string;
+      category?: string;
+      affectedComponents?: string[];
+    };
     const diag = payload.diagnosis as { rootCause?: string; hypothesis?: string };
     const score = Math.round(payload.evalScore * 100);
     const sevEmoji = SEV_EMOJI[cls.severity?.toLowerCase() ?? ''] ?? '⚪';
-    const scoreBar = '█'.repeat(Math.round(payload.evalScore * 10)) + '░'.repeat(10 - Math.round(payload.evalScore * 10));
+    const scoreBar =
+      '█'.repeat(Math.round(payload.evalScore * 10)) +
+      '░'.repeat(10 - Math.round(payload.evalScore * 10));
 
     const diffPreview = payload.proposedDiff
-      .replace(/^```diff\n?/, '').replace(/\n?```$/, '')
-      .split('\n').slice(0, 15).join('\n');
+      .replace(/^```diff\n?/, '')
+      .replace(/\n?```$/, '')
+      .split('\n')
+      .slice(0, 15)
+      .join('\n');
 
     const blocks: KnownBlock[] = [
       {
@@ -116,7 +137,10 @@ export class SlackService {
           { type: 'mrkdwn', text: `*Severity:*\n${sevEmoji} ${this.cap(cls.severity ?? '-')}` },
           { type: 'mrkdwn', text: `*Category:*\n${this.cap(cls.category ?? '-')}` },
           { type: 'mrkdwn', text: `*Score:*\n${scoreBar} ${score}/100` },
-          { type: 'mrkdwn', text: `*Affected:*\n${(cls.affectedComponents ?? []).join(', ') || '-'}` },
+          {
+            type: 'mrkdwn',
+            text: `*Affected:*\n${(cls.affectedComponents ?? []).join(', ') || '-'}`,
+          },
         ],
       },
       { type: 'divider' },
@@ -140,21 +164,25 @@ export class SlackService {
     if (payload.prUrl) {
       blocks.push({
         type: 'actions',
-        elements: [{
-          type: 'button',
-          text: { type: 'plain_text', text: `🔀 View PR #${payload.prNumber}`, emoji: true },
-          url: payload.prUrl,
-          style: 'primary',
-        }],
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: `🔀 View PR #${payload.prNumber}`, emoji: true },
+            url: payload.prUrl,
+            style: 'primary',
+          },
+        ],
       });
     }
 
     blocks.push({
       type: 'context',
-      elements: [{
-        type: 'mrkdwn',
-        text: `Correctness ${Math.round((payload.evalBreakdown.correctness ?? 0) * 100)}% · Completeness ${Math.round((payload.evalBreakdown.completeness ?? 0) * 100)}% · Safety ${Math.round((payload.evalBreakdown.safety ?? 0) * 100)}% · Clarity ${Math.round((payload.evalBreakdown.clarity ?? 0) * 100)}%  |  Run \`${payload.runId.slice(0, 8)}\``,
-      }],
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: `Correctness ${Math.round((payload.evalBreakdown.correctness ?? 0) * 100)}% · Completeness ${Math.round((payload.evalBreakdown.completeness ?? 0) * 100)}% · Safety ${Math.round((payload.evalBreakdown.safety ?? 0) * 100)}% · Clarity ${Math.round((payload.evalBreakdown.clarity ?? 0) * 100)}%  |  Run \`${payload.runId.slice(0, 8)}\``,
+        },
+      ],
     });
 
     try {

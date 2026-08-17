@@ -41,7 +41,7 @@ export class RerankerService {
   ) {
     this.enabled = config.get<boolean>('RERANK_ENABLED') ?? true;
     this.defaultTopN = config.get<number>('RERANK_TOP_N') ?? 8;
-    this.model = config.get<string>('OPENAI_RERANK_MODEL');
+    this.model = this.llm.rerankModel;
   }
 
   async rerank<T extends RerankCandidate>(

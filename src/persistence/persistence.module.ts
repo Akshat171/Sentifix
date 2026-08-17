@@ -16,7 +16,14 @@ import { SlackInstallation } from './entities/slack-installation.entity';
         return {
           type: 'postgres',
           url: config.get<string>('DATABASE_URL'),
-          entities: [Issue, Run, EvalResult, Installation, InstallationRepository, SlackInstallation],
+          entities: [
+            Issue,
+            Run,
+            EvalResult,
+            Installation,
+            InstallationRepository,
+            SlackInstallation,
+          ],
           // Entity tables have no migrations — synchronize creates them.
           // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).
           synchronize: !isProd || config.get<boolean>('DB_SYNCHRONIZE') === true,

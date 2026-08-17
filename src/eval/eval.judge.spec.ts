@@ -3,8 +3,14 @@ import { EvalJudge, JudgeInput } from './eval.judge';
 import { LlmProvider } from '../llm/llm.provider';
 
 function makeJudge(chatImpl: jest.Mock, judgeModel = 'gpt-4o') {
-  const llm = { chat: chatImpl, chatModel: 'gpt-4o-mini' } as unknown as LlmProvider;
-  const config = { get: () => judgeModel } as unknown as ConfigService;
+  // judgeModel is resolved by LlmProvider now, so it follows LLM_PROVIDER
+  // rather than being read from a vendor-specific env var here.
+  const llm = {
+    chat: chatImpl,
+    chatModel: 'gpt-4o-mini',
+    judgeModel,
+  } as unknown as LlmProvider;
+  const config = { get: () => undefined } as unknown as ConfigService;
   return new EvalJudge(llm, config);
 }
 

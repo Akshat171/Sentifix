@@ -40,7 +40,12 @@ export class IngestionController {
   async handleGithubWebhook(
     @Headers('x-github-event') event: string,
     @Headers('x-hub-signature-256') signature: string,
-    @Body() payload: GithubIssuePayload & GithubPushPayload & GithubInstallationPayload & GithubInstallationReposPayload & GithubIssueCommentPayload,
+    @Body()
+    payload: GithubIssuePayload &
+      GithubPushPayload &
+      GithubInstallationPayload &
+      GithubInstallationReposPayload &
+      GithubIssueCommentPayload,
     @Req() req: RawBodyRequest<{ rawBody?: Buffer }>,
   ): Promise<{ received: boolean }> {
     const rawBody = req.rawBody;

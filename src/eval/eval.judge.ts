@@ -44,7 +44,9 @@ export class EvalJudge {
     private readonly llm: LlmProvider,
     private readonly config: ConfigService,
   ) {
-    this.judgeModel = config.get<string>('OPENAI_JUDGE_MODEL') ?? this.llm.chatModel;
+    // Resolved by the provider so the judge follows LLM_PROVIDER without
+    // needing to know which vendor's model names are in play.
+    this.judgeModel = this.llm.judgeModel;
   }
 
   async evaluate(input: JudgeInput): Promise<JudgeOutput> {

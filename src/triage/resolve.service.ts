@@ -93,7 +93,7 @@ export class ResolveService {
         // If exact path not found, search repo tree for file with same name
         if (!existing) {
           this.logger.warn(`${filePath} not found — searching repo tree for matching filename`);
-          resolvedPath = await this.findFilePath(repoFullName, filePath, baseBranch) ?? filePath;
+          resolvedPath = (await this.findFilePath(repoFullName, filePath, baseBranch)) ?? filePath;
           if (resolvedPath !== filePath) {
             this.logger.log(`Resolved ${filePath} → ${resolvedPath}`);
             existing = await this.github.getFileContent(repoFullName, resolvedPath, baseBranch);
@@ -201,19 +201,31 @@ export class ResolveService {
   ): Promise<string | false> {
     this.logger.log(`Trying strategy 1 (fuzz=2) for ${filePath}`);
     let result = applyPatch(content, patch, { fuzzFactor: 2 });
-    if (result !== false) { this.logger.log(`Strategy 1 succeeded`); return result; }
+    if (result !== false) {
+      this.logger.log(`Strategy 1 succeeded`);
+      return result;
+    }
 
     this.logger.log(`Trying strategy 2 (fuzz=5) for ${filePath}`);
     result = applyPatch(content, patch, { fuzzFactor: 5 });
-    if (result !== false) { this.logger.log(`Strategy 2 succeeded`); return result; }
+    if (result !== false) {
+      this.logger.log(`Strategy 2 succeeded`);
+      return result;
+    }
 
     this.logger.log(`Trying strategy 3 (segment search-replace) for ${filePath}`);
     result = this.applyDirect(content, patch);
-    if (result !== false) { this.logger.log(`Strategy 3 succeeded`); return result; }
+    if (result !== false) {
+      this.logger.log(`Strategy 3 succeeded`);
+      return result;
+    }
 
     this.logger.log(`Trying strategy 4 (LLM) for ${filePath}`);
     result = await this.applyWithLlm(content, filePath, fullDiff, rootCause);
-    if (result !== false) { this.logger.log(`Strategy 4 (LLM) succeeded`); return result; }
+    if (result !== false) {
+      this.logger.log(`Strategy 4 (LLM) succeeded`);
+      return result;
+    }
 
     this.logger.warn(`All 4 strategies failed for ${filePath}`);
     return false;
@@ -340,7 +352,9 @@ ${content}`,
       );
 
       if (modified.trim() === content.trim()) {
-        this.logger.warn(`LLM returned identical content for ${filePath} — fix may already be applied`);
+        this.logger.warn(
+          `LLM returned identical content for ${filePath} — fix may already be applied`,
+        );
         return false;
       }
 
@@ -369,7 +383,9 @@ ${content}`,
       .map((c) => {
         const cParts = c.split('/');
         const dParts = diffPath.split('/');
-        const overlap = cParts.filter((p, i) => p === dParts[dParts.length - cParts.length + i]).length;
+        const overlap = cParts.filter(
+          (p, i) => p === dParts[dParts.length - cParts.length + i],
+        ).length;
         return { path: c, overlap };
       })
       .sort((a, b) => b.overlap - a.overlap);

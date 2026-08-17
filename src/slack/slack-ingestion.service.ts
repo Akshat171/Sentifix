@@ -14,12 +14,12 @@ import { SlackService } from './slack.service';
 
 export interface SlackMentionEvent {
   type: string;
-  text: string;           // raw message text including the @mention
-  user: string;           // Slack user ID who sent it
-  channel: string;        // channel ID
-  ts: string;             // message timestamp (unique ID)
-  thread_ts?: string;     // parent message ts if replying in thread
-  team: string;           // workspace ID
+  text: string; // raw message text including the @mention
+  user: string; // Slack user ID who sent it
+  channel: string; // channel ID
+  ts: string; // message timestamp (unique ID)
+  thread_ts?: string; // parent message ts if replying in thread
+  team: string; // workspace ID
 }
 
 @Injectable()
@@ -46,16 +46,18 @@ export class SlackIngestionService {
   async handleMention(event: SlackMentionEvent): Promise<void> {
     // Strip the @mention, Slack formatting, and normalize quotes
     const cleanText = (event.text ?? '')
-      .replace(/<@[A-Z0-9]+>/g, '')    // remove @mentions
+      .replace(/<@[A-Z0-9]+>/g, '') // remove @mentions
       .replace(/[“”„]/g, '"') // smart double quotes → straight
       .replace(/[‘’‚]/g, "'") // smart single quotes → straight
-      .replace(/<[^>]+>/g, '')           // strip remaining Slack formatting tags
+      .replace(/<[^>]+>/g, '') // strip remaining Slack formatting tags
       .trim();
     if (!cleanText) return;
 
     const threadTs = event.thread_ts ?? event.ts;
 
-    this.logger.log(`Slack mention from ${event.user} in ${event.channel}: "${cleanText.slice(0, 80)}"`);
+    this.logger.log(
+      `Slack mention from ${event.user} in ${event.channel}: "${cleanText.slice(0, 80)}"`,
+    );
 
     // 1. Detect repo: message → per-workspace default → global default
     const repoFullName =
@@ -70,7 +72,9 @@ export class SlackIngestionService {
     // 1b. Per-tenant daily cap
     const quota = await this.quota.check(repoFullName);
     if (!quota.allowed) {
-      this.logger.warn(`Slack triage quota reached for ${repoFullName}: ${quota.used}/${quota.limit}/day`);
+      this.logger.warn(
+        `Slack triage quota reached for ${repoFullName}: ${quota.used}/${quota.limit}/day`,
+      );
       await this.slackService.postNotice(
         event.channel,
         threadTs,
@@ -81,7 +85,11 @@ export class SlackIngestionService {
     }
 
     // 2. Post placeholder reply immediately (uses this workspace's bot token)
-    const placeholderTs = await this.slackService.postPlaceholder(event.channel, threadTs, event.team);
+    const placeholderTs = await this.slackService.postPlaceholder(
+      event.channel,
+      threadTs,
+      event.team,
+    );
 
     // 3. Persist as an Issue so it appears in the dashboard
     const issue = await this.issueRepo.save(
@@ -131,7 +139,10 @@ export class SlackIngestionService {
           run,
           judgeModel: evalOutput.model,
           score: evalOutput.score,
-          rationale: JSON.stringify({ rationale: evalOutput.rationale, breakdown: evalOutput.breakdown }),
+          rationale: JSON.stringify({
+            rationale: evalOutput.rationale,
+            breakdown: evalOutput.breakdown,
+          }),
         }),
       );
 
@@ -150,7 +161,9 @@ export class SlackIngestionService {
         const branchName = `sentifix/slack-${event.channel}-${event.ts.replace('.', '')}`;
         // PR creation handled by resolve flow — here we just note it's possible
         this.logger.log(`Triage complete for Slack issue, score: ${evalOutput.score.toFixed(2)}`);
-      } catch { /* PR creation is best-effort */ }
+      } catch {
+        /* PR creation is best-effort */
+      }
 
       // 7. Update the Slack placeholder with the full report
       if (placeholderTs) {
@@ -209,7 +222,7 @@ export class SlackIngestionService {
     } catch (err) {
       this.logger.error(
         `Indexing failed for ${repoFullName}: ${(err as Error).message}. ` +
-        'Check that GITHUB_TOKEN has access to this repo and SLACK_DEFAULT_REPO is correct.',
+          'Check that GITHUB_TOKEN has access to this repo and SLACK_DEFAULT_REPO is correct.',
       );
       // Don't rethrow — let triage continue without RAG context
     }

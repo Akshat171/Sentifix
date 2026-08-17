@@ -150,10 +150,7 @@ export class IngestionService {
     const saved = await this.issueRepo.save(record);
 
     // Post placeholder immediately so the issue thread shows activity right away
-    const commentId = await this.github.postPlaceholderComment(
-      repository.full_name,
-      issue.number,
-    );
+    const commentId = await this.github.postPlaceholderComment(repository.full_name, issue.number);
 
     if (commentId) {
       saved.githubCommentId = commentId;

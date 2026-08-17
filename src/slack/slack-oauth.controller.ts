@@ -18,7 +18,10 @@ export class SlackOAuthController {
       return;
     }
     const state = crypto.randomBytes(16).toString('hex');
-    reply.header('Set-Cookie', `${STATE_COOKIE}=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax`);
+    reply.header(
+      'Set-Cookie',
+      `${STATE_COOKIE}=${state}; HttpOnly; Path=/; Max-Age=600; SameSite=Lax`,
+    );
     reply.code(302).redirect(this.oauth.authorizeUrl(state));
   }
 

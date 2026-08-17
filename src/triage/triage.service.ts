@@ -47,13 +47,20 @@ export class TriageService {
     // Per-tenant daily cap — protects LLM spend on public multi-tenant deploys
     const quota = await this.quota.check(job.repoFullName);
     if (!quota.allowed) {
-      this.logger.warn(`Triage quota reached for ${job.repoFullName}: ${quota.used}/${quota.limit}/day`);
+      this.logger.warn(
+        `Triage quota reached for ${job.repoFullName}: ${quota.used}/${quota.limit}/day`,
+      );
       const body = [
         '## 🤖 Sentifix — daily limit reached',
         '',
         `This account has hit its automated-triage limit (**${quota.limit}/day**). Triage resumes once the 24h window rolls over.`,
       ].join('\n');
-      await this.github.postNotice(job.repoFullName, job.githubIssueNumber, issue.githubCommentId, body);
+      await this.github.postNotice(
+        job.repoFullName,
+        job.githubIssueNumber,
+        issue.githubCommentId,
+        body,
+      );
       return;
     }
 
@@ -153,9 +160,7 @@ export class TriageService {
     if (commentId) {
       const [owner, repo] = repoFullName.split('/');
       await this.dataSource.query('SELECT 1').catch(() => null); // keep connection alive
-      this.github
-        .postPlaceholderComment(repoFullName, issueNumber)
-        .catch(() => null);
+      this.github.postPlaceholderComment(repoFullName, issueNumber).catch(() => null);
     }
 
     await this.indexingJob.run({ repoFullName });
@@ -224,7 +229,6 @@ export class TriageService {
     const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
     return rows.map((r) => r.repoFullName);
   }
-
 
   /** Throw unless the repo is visible to the scope (no-op when unrestricted). */
   async assertRepoInScope(repoFullName: string, scope?: TenantScope): Promise<void> {

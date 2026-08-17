@@ -29,6 +29,7 @@
     "simulate:webhook": "bash scripts/simulate-webhook.sh"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.32.0",
     "@fastify/static": "^8.0.4",
     "@langchain/langgraph": "^0.2.35",
     "@nestjs/common": "^10.4.15",

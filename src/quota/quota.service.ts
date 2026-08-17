@@ -24,7 +24,8 @@ export class QuotaService {
   constructor(
     config: ConfigService,
     @InjectRepository(Run) private readonly runRepo: Repository<Run>,
-    @InjectRepository(InstallationRepository) private readonly mapRepo: Repository<InstallationRepository>,
+    @InjectRepository(InstallationRepository)
+    private readonly mapRepo: Repository<InstallationRepository>,
   ) {
     this.dailyLimit = Number(config.get<number>('TRIAGE_DAILY_LIMIT') ?? 0);
   }

@@ -9,11 +9,9 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter(),
-    { rawBody: true },
-  );
+  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter(), {
+    rawBody: true,
+  });
 
   // Connect RabbitMQ consumer — makes @EventPattern decorators active
   app.connectMicroservice<MicroserviceOptions>({

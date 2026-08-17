@@ -17,7 +17,7 @@ import { SlackIngestionService, SlackMentionEvent } from './slack-ingestion.serv
 
 interface SlackEventWrapper {
   type: string;
-  challenge?: string;         // url_verification
+  challenge?: string; // url_verification
   event?: SlackMentionEvent;
   team_id?: string;
 }

@@ -101,12 +101,17 @@ export class GithubService {
     try {
       const octokit = await this.getOctokit(repoFullName);
       const { data } = await octokit.issues.createComment({
-        owner, repo, issue_number: issueNumber, body,
+        owner,
+        repo,
+        issue_number: issueNumber,
+        body,
       });
       this.logger.log(`Posted placeholder comment on ${repoFullName}#${issueNumber}`);
       return data.id;
     } catch (err) {
-      this.logger.error(`Failed to post placeholder on ${repoFullName}#${issueNumber}: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to post placeholder on ${repoFullName}#${issueNumber}: ${(err as Error).message}`,
+      );
       return null;
     }
   }
@@ -127,7 +132,9 @@ export class GithubService {
         await octokit.issues.createComment({ owner, repo, issue_number: issueNumber, body });
       }
     } catch (err) {
-      this.logger.error(`Failed to post notice on ${repoFullName}#${issueNumber}: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to post notice on ${repoFullName}#${issueNumber}: ${(err as Error).message}`,
+      );
     }
   }
 
@@ -137,21 +144,32 @@ export class GithubService {
     const octokit = await this.getOctokit(payload.repoFullName);
     try {
       await octokit.issues.createComment({
-        owner, repo, issue_number: payload.issueNumber, body,
+        owner,
+        repo,
+        issue_number: payload.issueNumber,
+        body,
       });
       this.logger.log(`Posted triage comment on ${payload.repoFullName}#${payload.issueNumber}`);
     } catch (err) {
-      this.logger.error(`Failed to post comment on ${payload.repoFullName}#${payload.issueNumber}: ${(err as Error).message}`);
+      this.logger.error(
+        `Failed to post comment on ${payload.repoFullName}#${payload.issueNumber}: ${(err as Error).message}`,
+      );
     }
   }
 
-  async updateTriageComment(repoFullName: string, commentId: number, payload: TriageCommentPayload): Promise<void> {
+  async updateTriageComment(
+    repoFullName: string,
+    commentId: number,
+    payload: TriageCommentPayload,
+  ): Promise<void> {
     const [owner, repo] = repoFullName.split('/');
     const body = this.formatComment(payload);
     const octokit = await this.getOctokit(repoFullName);
     try {
       await octokit.issues.updateComment({ owner, repo, comment_id: commentId, body });
-      this.logger.log(`Updated triage comment ${commentId} on ${repoFullName}#${payload.issueNumber}`);
+      this.logger.log(
+        `Updated triage comment ${commentId} on ${repoFullName}#${payload.issueNumber}`,
+      );
     } catch (err) {
       this.logger.error(`Failed to update comment ${commentId}: ${(err as Error).message}`);
       await this.postTriageComment(payload);
@@ -232,12 +250,18 @@ ${p.evalRationale}
     try {
       await octokit.git.deleteRef({ owner, repo, ref: `heads/${branchName}` });
       this.logger.log(`Deleted existing branch ${branchName}`);
-    } catch { /* didn't exist */ }
+    } catch {
+      /* didn't exist */
+    }
     await octokit.git.createRef({ owner, repo, ref: `refs/heads/${branchName}`, sha: fromSha });
     this.logger.log(`Created branch ${branchName} on ${repoFullName}`);
   }
 
-  async getFileContent(repoFullName: string, path: string, ref: string): Promise<{ content: string; sha: string } | null> {
+  async getFileContent(
+    repoFullName: string,
+    path: string,
+    ref: string,
+  ): Promise<{ content: string; sha: string } | null> {
     const [owner, repo] = repoFullName.split('/');
     const octokit = await this.getOctokit(repoFullName);
     try {
@@ -246,37 +270,74 @@ ${p.evalRationale}
         return { content: Buffer.from(data.content, 'base64').toString('utf-8'), sha: data.sha };
       }
       return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
-  async updateFile(repoFullName: string, path: string, newContent: string, fileSha: string, commitMessage: string, branch: string): Promise<void> {
+  async updateFile(
+    repoFullName: string,
+    path: string,
+    newContent: string,
+    fileSha: string,
+    commitMessage: string,
+    branch: string,
+  ): Promise<void> {
     const [owner, repo] = repoFullName.split('/');
     const octokit = await this.getOctokit(repoFullName);
     await octokit.repos.createOrUpdateFileContents({
-      owner, repo, path, branch, message: commitMessage,
-      content: Buffer.from(newContent).toString('base64'), sha: fileSha,
+      owner,
+      repo,
+      path,
+      branch,
+      message: commitMessage,
+      content: Buffer.from(newContent).toString('base64'),
+      sha: fileSha,
     });
   }
 
-  async createFile(repoFullName: string, path: string, content: string, commitMessage: string, branch: string): Promise<void> {
+  async createFile(
+    repoFullName: string,
+    path: string,
+    content: string,
+    commitMessage: string,
+    branch: string,
+  ): Promise<void> {
     const [owner, repo] = repoFullName.split('/');
     const octokit = await this.getOctokit(repoFullName);
     await octokit.repos.createOrUpdateFileContents({
-      owner, repo, path, branch, message: commitMessage,
+      owner,
+      repo,
+      path,
+      branch,
+      message: commitMessage,
       content: Buffer.from(content).toString('base64'),
     });
   }
 
-  async createPullRequest(repoFullName: string, title: string, body: string, head: string, base: string): Promise<{ number: number; html_url: string }> {
+  async createPullRequest(
+    repoFullName: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string,
+  ): Promise<{ number: number; html_url: string }> {
     const [owner, repo] = repoFullName.split('/');
     const octokit = await this.getOctokit(repoFullName);
     try {
-      const existing = await octokit.pulls.list({ owner, repo, head: `${owner}:${head}`, state: 'open' });
+      const existing = await octokit.pulls.list({
+        owner,
+        repo,
+        head: `${owner}:${head}`,
+        state: 'open',
+      });
       for (const pr of existing.data) {
         await octokit.pulls.update({ owner, repo, pull_number: pr.number, state: 'closed' });
         this.logger.log(`Closed stale PR #${pr.number} for branch ${head}`);
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
     const { data } = await octokit.pulls.create({ owner, repo, title, body, head, base });
     this.logger.log(`Created PR #${data.number} on ${repoFullName}: ${data.html_url}`);
     return { number: data.number, html_url: data.html_url };
