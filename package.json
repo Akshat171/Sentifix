@@ -27,7 +27,8 @@
     "embed:ab": "ts-node -r tsconfig-paths/register scripts/embed-ab.ts",
     "index:local": "ts-node -r tsconfig-paths/register scripts/index-local.ts",
     "simulate:webhook": "bash scripts/simulate-webhook.sh",
-    "check:models": "ts-node -r tsconfig-paths/register scripts/check-models.ts"
+    "check:models": "ts-node -r tsconfig-paths/register scripts/check-models.ts",
+    "verify:ledger": "ts-node -r tsconfig-paths/register scripts/verify-ledger.ts"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.32.0",

@@ -19,6 +19,24 @@ function isUniqueViolation(err: unknown): boolean {
   return (err as { code?: string })?.code === UNIQUE_VIOLATION;
 }
 
+/**
+ * TypeORM's query() returns `[rows, affectedCount]` for UPDATE ... RETURNING,
+ * not the rows array. Reading `.length` off the outer value therefore always
+ * gives 2, which silently turned every "did the guard match a row?" check into
+ * an unconditional yes — a customer with no credits could run without limit.
+ */
+function returnedRows<T>(result: unknown): T[] {
+  if (
+    Array.isArray(result) &&
+    result.length === 2 &&
+    Array.isArray(result[0]) &&
+    typeof result[1] === 'number'
+  ) {
+    return result[0] as T[];
+  }
+  return (Array.isArray(result) ? result : []) as T[];
+}
+
 @Injectable()
 export class LedgerService {
   private readonly logger = new Logger(LedgerService.name);
@@ -54,13 +72,15 @@ export class LedgerService {
     if (amountMicro <= 0) return { ok: true, availableMicro: await this.availableMicro(accountId) };
 
     return this.dataSource.transaction(async (tx) => {
-      const rows: Array<{ available: string }> = await tx.query(
-        `UPDATE accounts
-            SET held_micro = held_micro + $1, "updatedAt" = now()
+      const rows = returnedRows<{ available: string }>(
+        await tx.query(
+          `UPDATE accounts
+            SET "heldMicro" = "heldMicro" + $1, "updatedAt" = now()
           WHERE id = $2
-            AND balance_micro - held_micro >= $1
-      RETURNING balance_micro - held_micro AS available`,
-        [amountMicro, accountId],
+            AND "balanceMicro" - "heldMicro" >= $1
+      RETURNING "balanceMicro" - "heldMicro" AS available`,
+          [amountMicro, accountId],
+        ),
       );
 
       if (rows.length === 0) {
@@ -118,16 +138,18 @@ export class LedgerService {
         );
       }
 
-      const updated: Array<{ balance_micro: string }> = await tx.query(
-        `UPDATE accounts
-            SET held_micro = GREATEST(held_micro - $1, 0),
-                balance_micro = balance_micro - $2,
+      const updated = returnedRows<{ balanceMicro: string }>(
+        await tx.query(
+          `UPDATE accounts
+            SET "heldMicro" = GREATEST("heldMicro" - $1, 0),
+                "balanceMicro" = "balanceMicro" - $2,
                 "updatedAt" = now()
           WHERE id = $3
-      RETURNING balance_micro`,
-        [heldMicro, costMicro, accountId],
+      RETURNING "balanceMicro"`,
+          [heldMicro, costMicro, accountId],
+        ),
       );
-      const balanceAfter = Number(updated[0]?.balance_micro ?? 0);
+      const balanceAfter = Number(updated[0]?.balanceMicro ?? 0);
 
       if (hold) {
         await tx.update(CreditHold, { id: hold.id }, { state: 'settled' });
@@ -171,7 +193,7 @@ export class LedgerService {
       if (!hold || hold.state !== 'active') return;
 
       await tx.query(
-        `UPDATE accounts SET held_micro = GREATEST(held_micro - $1, 0), "updatedAt" = now()
+        `UPDATE accounts SET "heldMicro" = GREATEST("heldMicro" - $1, 0), "updatedAt" = now()
           WHERE id = $2`,
         [hold.amountMicro, hold.accountId],
       );
@@ -191,12 +213,14 @@ export class LedgerService {
 
     try {
       return await this.dataSource.transaction(async (tx) => {
-        const rows: Array<{ balance_micro: string }> = await tx.query(
-          `UPDATE accounts SET balance_micro = balance_micro + $1, "updatedAt" = now()
-            WHERE id = $2 RETURNING balance_micro`,
-          [amountMicro, accountId],
+        const rows = returnedRows<{ balanceMicro: string }>(
+          await tx.query(
+            `UPDATE accounts SET "balanceMicro" = "balanceMicro" + $1, "updatedAt" = now()
+            WHERE id = $2 RETURNING "balanceMicro"`,
+            [amountMicro, accountId],
+          ),
         );
-        const balanceAfter = Number(rows[0]?.balance_micro ?? 0);
+        const balanceAfter = Number(rows[0]?.balanceMicro ?? 0);
 
         await tx.insert(CreditLedgerEntry, {
           accountId,
