@@ -13,6 +13,12 @@ export class TriageController {
     private readonly resolve: ResolveService,
   ) {}
 
+  /** One row per connected repo — powers the dashboard home. */
+  @Get('overview')
+  getOverview(@Req() req: { session?: SessionPayload }) {
+    return this.triage.getRepoOverview(this.scope(req));
+  }
+
   @Get('issues')
   getAllIssues(@Req() req: { session?: SessionPayload }) {
     return this.triage.getAllIssues(this.scope(req));

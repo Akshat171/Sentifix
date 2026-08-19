@@ -24,6 +24,19 @@ import { LowBalanceService } from '../billing/low-balance.service';
  */
 export type TenantScope = number[] | undefined;
 
+export interface RepoOverview {
+  repoFullName: string;
+  issues: number;
+  runs: number;
+  completed: number;
+  failed: number;
+  /** Mean eval score across this repo's runs, or null when nothing scored yet. */
+  avgScore: number | null;
+  lastActivity: string | null;
+  indexed: boolean;
+  chunks: number;
+}
+
 @Injectable()
 export class TriageService {
   private readonly logger = new Logger(TriageService.name);
@@ -288,6 +301,101 @@ export class TriageService {
     if (!scope.length) return [];
     const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
     return rows.map((r) => r.repoFullName);
+  }
+
+  /**
+   * One row per connected repository, with everything needed to answer "is this
+   * working for me?" without drilling into a single issue.
+   *
+   * Repos come from the installation record rather than from the issues table, so
+   * a freshly connected repo appears immediately with zeroes instead of being
+   * invisible until its first bug report — which is what made the dashboard feel
+   * empty and pushed people back to the connect screen.
+   */
+  async getRepoOverview(scope?: TenantScope): Promise<RepoOverview[]> {
+    const repos = await this.reposForOverview(scope);
+    if (repos.length === 0) return [];
+
+    const rows: Array<{
+      repofullname: string;
+      issues: string;
+      runs: string;
+      completed: string;
+      failed: string;
+      avgscore: string | null;
+      lastactivity: string | null;
+      chunks: string;
+    }> = await this.dataSource.query(
+      `SELECT r.repo                                        AS repofullname,
+              COALESCE(i.issues, 0)::text                   AS issues,
+              COALESCE(ru.runs, 0)::text                    AS runs,
+              COALESCE(ru.completed, 0)::text               AS completed,
+              COALESCE(ru.failed, 0)::text                  AS failed,
+              ev.avgscore::text                             AS avgscore,
+              GREATEST(i.last_issue, ru.last_run)::text      AS lastactivity,
+              COALESCE(c.chunks, 0)::text                   AS chunks
+         FROM unnest($1::text[]) AS r(repo)
+         LEFT JOIN (
+           SELECT "repoFullName" AS repo, COUNT(*) AS issues, MAX("createdAt") AS last_issue
+             FROM issues WHERE "repoFullName" = ANY($1) GROUP BY "repoFullName"
+         ) i ON i.repo = r.repo
+         LEFT JOIN (
+           SELECT "repoFullName" AS repo, COUNT(*) AS runs,
+                  COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                  COUNT(*) FILTER (WHERE status = 'failed')    AS failed,
+                  MAX("startedAt") AS last_run
+             FROM runs WHERE "repoFullName" = ANY($1) GROUP BY "repoFullName"
+         ) ru ON ru.repo = r.repo
+         LEFT JOIN (
+           SELECT run."repoFullName" AS repo, ROUND(AVG(e.score)::numeric, 2) AS avgscore
+             FROM eval_results e
+             JOIN runs run ON run.id = e."runId"
+            WHERE run."repoFullName" = ANY($1) GROUP BY run."repoFullName"
+         ) ev ON ev.repo = r.repo
+         LEFT JOIN (
+           SELECT repo_full_name AS repo, COUNT(*) AS chunks
+             FROM code_chunks WHERE repo_full_name = ANY($1) GROUP BY repo_full_name
+         ) c ON c.repo = r.repo
+        ORDER BY GREATEST(i.last_issue, ru.last_run) DESC NULLS LAST, r.repo`,
+      [repos],
+    );
+
+    return rows.map((row) => ({
+      repoFullName: row.repofullname,
+      issues: Number(row.issues),
+      runs: Number(row.runs),
+      completed: Number(row.completed),
+      failed: Number(row.failed),
+      avgScore: row.avgscore === null ? null : Number(row.avgscore),
+      lastActivity: row.lastactivity,
+      indexed: Number(row.chunks) > 0,
+      chunks: Number(row.chunks),
+    }));
+  }
+
+  /**
+   * Repos the caller may see.
+   *
+   * A tenant sees exactly the repos mapped to their installations — an unmapped
+   * repo cannot be attributed to anyone, so including it would leak another
+   * customer's data. The unrestricted (operator) view additionally unions in any
+   * repo that has issues or runs but no mapping, which otherwise stays invisible
+   * despite being active.
+   */
+  private async reposForOverview(scope?: TenantScope): Promise<string[]> {
+    if (scope === undefined) {
+      const rows: Array<{ repo: string }> = await this.dataSource.query(
+        `SELECT DISTINCT repo FROM (
+           SELECT "repoFullName" AS repo FROM installation_repositories
+           UNION SELECT "repoFullName" FROM issues WHERE "repoFullName" IS NOT NULL
+           UNION SELECT "repoFullName" FROM runs   WHERE "repoFullName" IS NOT NULL
+         ) t WHERE repo IS NOT NULL`,
+      );
+      return rows.map((r) => r.repo);
+    }
+    if (scope.length === 0) return [];
+    const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
+    return [...new Set(rows.map((r) => r.repoFullName))];
   }
 
   /** Throw unless the repo is visible to the scope (no-op when unrestricted). */

@@ -15,7 +15,7 @@ export class DashboardController {
     this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
   }
 
-  @Get()
+  @Get('issues')
   serve(@Req() req: HttpRequest, @Res() reply: HttpReply): void {
     let userBadge = '';
     if (this.authEnabled) {
@@ -28,7 +28,7 @@ export class DashboardController {
     }
 
     const html = page({
-      title: 'Sentifix — dashboard',
+      title: 'Sentifix — issues',
       fullHeight: true,
       head: `<style>
 header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:12px;flex-shrink:0}
