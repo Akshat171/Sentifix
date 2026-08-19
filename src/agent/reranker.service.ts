@@ -48,6 +48,7 @@ export class RerankerService {
     query: string,
     candidates: T[],
     topN?: number,
+    modelKey?: string,
   ): Promise<T[]> {
     const limit = topN ?? this.defaultTopN;
 
@@ -57,7 +58,7 @@ export class RerankerService {
     }
 
     try {
-      const scores = await this.scoreCandidates(query, candidates);
+      const scores = await this.scoreCandidates(query, candidates, modelKey);
       const byIndex = new Map(scores.map((s) => [s.index, s.score]));
 
       return candidates
@@ -75,6 +76,7 @@ export class RerankerService {
   private async scoreCandidates(
     query: string,
     candidates: RerankCandidate[],
+    modelKey?: string,
   ): Promise<RerankScore[]> {
     const list = candidates
       .map((c, i) => `[${i}] ${c.filePath}\n${c.content.slice(0, SNIPPET_CHARS)}`)
@@ -94,7 +96,7 @@ Score 0.0 (irrelevant) to 1.0 (essential). Output valid JSON scoring EVERY index
         },
       ],
       true,
-      this.model,
+      modelKey ?? this.model,
     );
 
     const parsed = JSON.parse(raw) as { scores?: RerankScore[] };

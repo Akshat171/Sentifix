@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { LlmProvider } from '../llm/llm.provider';
+import type { ModelSelection } from '../llm/model-catalog';
 import { VectorStoreService } from '../indexing/vector-store.service';
 import { RerankerService } from './reranker.service';
 import { collectSignalPaths, planNeighborFetch, prioritizeBySignals } from './context-expansion';
@@ -12,6 +13,11 @@ export interface TriageInput {
   repoFullName: string;
   title: string;
   body: string;
+  /**
+   * Which models this tenant is on. Omitted = the deployment defaults on
+   * LlmProvider, which is what self-hosted single-tenant installs do.
+   */
+  models?: ModelSelection;
 }
 
 export interface ClassificationResult {
@@ -99,6 +105,29 @@ export class AgentPipeline {
     };
   }
 
+  /**
+   * Re-runs only the fix step against a different model, reusing the
+   * classification, retrieved context and diagnosis from a prior run.
+   *
+   * Deliberately narrow: retrieval and diagnosis are left alone so an
+   * escalation costs one extra call rather than a whole second pipeline. The
+   * trade-off is that it cannot rescue a run whose *diagnosis* was wrong — only
+   * one where the diagnosis was sound but the diff was poor.
+   */
+  async proposeFixOnly(input: TriageInput, prior: TriageOutput, modelKey: string): Promise<string> {
+    this.logger.log(`proposeFix retry on ${modelKey} for issue ${input.issueId}`);
+
+    const result = await this.proposeFixNode({
+      issue: { ...input, models: { chat: modelKey, rerank: modelKey } },
+      classification: prior.classification,
+      context: prior.context,
+      diagnosis: prior.diagnosis,
+      proposedDiff: prior.proposedDiff,
+    });
+
+    return result.proposedDiff ?? '';
+  }
+
   // ── Nodes ──────────────────────────────────────────────────────────────────
 
   private async classifyNode(state: PState): Promise<Partial<PState>> {
@@ -123,6 +152,7 @@ Respond with valid JSON matching this schema:
         },
       ],
       true,
+      state.issue.models?.chat,
     );
 
     const classification: ClassificationResult = JSON.parse(raw);
@@ -244,16 +274,20 @@ Respond with valid JSON matching this schema:
    */
   private async generateHypotheticalCode(issue: TriageInput): Promise<string> {
     try {
-      return await this.llm.chat([
-        {
-          role: 'system',
-          content: `You are a code search assistant. Write a SHORT code snippet (10-20 lines) that would likely contain the bug described. Use the same language/framework as the repository. Include realistic function names, variable names, and patterns. Output ONLY code, no explanation.`,
-        },
-        {
-          role: 'user',
-          content: `Repository: ${issue.repoFullName}\nBug: ${issue.title}\n\n${issue.body.slice(0, 500)}`,
-        },
-      ]);
+      return await this.llm.chat(
+        [
+          {
+            role: 'system',
+            content: `You are a code search assistant. Write a SHORT code snippet (10-20 lines) that would likely contain the bug described. Use the same language/framework as the repository. Include realistic function names, variable names, and patterns. Output ONLY code, no explanation.`,
+          },
+          {
+            role: 'user',
+            content: `Repository: ${issue.repoFullName}\nBug: ${issue.title}\n\n${issue.body.slice(0, 500)}`,
+          },
+        ],
+        false,
+        issue.models?.chat,
+      );
     } catch {
       return issue.title; // fallback to plain text if LLM call fails
     }
@@ -319,6 +353,7 @@ Given the issue and relevant code context, produce valid JSON:
         },
       ],
       true,
+      state.issue.models?.chat,
     );
 
     const diagnosis: DiagnosisResult = JSON.parse(raw);
@@ -376,7 +411,12 @@ Given the issue and relevant code context, produce valid JSON:
     if (state.context.length === 0) return {};
 
     const query = `${state.issue.title}\n${state.diagnosis?.rootCause ?? ''}\n${state.issue.body.slice(0, 500)}`;
-    const ranked = await this.reranker.rerank(query, state.context);
+    const ranked = await this.reranker.rerank(
+      query,
+      state.context,
+      undefined,
+      state.issue.models?.rerank,
+    );
 
     this.logger.log(`rerank: ${state.context.length} → ${ranked.length} chunks`);
     return { context: ranked };
@@ -422,10 +462,11 @@ Given the issue and relevant code context, produce valid JSON:
       `proposeFix: building diff for ${usedPaths.length} files, hasContext=${hasContext}`,
     );
 
-    const proposedDiff = await this.llm.chat([
-      {
-        role: 'system',
-        content: `You are an expert engineer proposing a minimal, correct fix for a bug.
+    const proposedDiff = await this.llm.chat(
+      [
+        {
+          role: 'system',
+          content: `You are an expert engineer proposing a minimal, correct fix for a bug.
 
 Output ONLY unified diffs in standard format. For multi-file fixes, concatenate the diffs:
 --- a/path/to/file1
@@ -448,10 +489,10 @@ Rules:
 - If you have code context, produce exact diffs matching the actual code.
 - If no code context, generate best-effort diffs from the diagnosis and file paths.
 - Keep changes minimal — only what is necessary to fix the issue.`,
-      },
-      {
-        role: 'user',
-        content: `Issue: ${state.issue.title}
+        },
+        {
+          role: 'user',
+          content: `Issue: ${state.issue.title}
 
 ${state.issue.body}
 
@@ -460,8 +501,11 @@ Hypothesis: ${state.diagnosis?.hypothesis}
 Files to change: ${relevantFiles.join(', ')}
 
 ${hasContext ? `Code context:\n${contextBlock}` : `No code context available. Generate fixes based on the diagnosis and your knowledge of common ${state.issue.repoFullName.split('/').pop()} patterns.`}`,
-      },
-    ]);
+        },
+      ],
+      false,
+      state.issue.models?.chat,
+    );
 
     return { proposedDiff };
   }

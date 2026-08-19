@@ -6,6 +6,7 @@ import { GithubService } from '../github/github.service';
 import { LlmProvider } from '../llm/llm.provider';
 import { Run } from '../persistence/entities/run.entity';
 import { Issue } from '../persistence/entities/issue.entity';
+import { TenantModelService } from '../llm/tenant-model.service';
 
 type ParsedDiff = ReturnType<typeof parsePatch>[0];
 
@@ -26,6 +27,7 @@ export class ResolveService {
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
     private readonly github: GithubService,
     private readonly llm: LlmProvider,
+    private readonly tenantModels: TenantModelService,
   ) {}
 
   async resolveRun(runId: string, repoFullNameOverride?: string): Promise<ResolveResult> {
@@ -56,6 +58,9 @@ export class ResolveService {
     const cleanDiff = this.normalizeDiff(diff);
     const patches = parsePatch(cleanDiff);
     if (!patches.length) throw new BadRequestException('Could not parse proposed diff');
+
+    // Patch-repair is billed to the tenant, so it runs on their model, not the default.
+    const models = await this.tenantModels.forRepo(repoFullName);
 
     const { name: baseBranch, sha: baseSha } = await this.github.getDefaultBranch(repoFullName);
     const branchName = `sentifix/issue-${issue.githubIssueNumber}-fix`;
@@ -111,6 +116,7 @@ export class ResolveService {
             filePath,
             cleanDiff,
             String(diag?.rootCause ?? ''),
+            models.chat,
           );
 
           if (patched === false) {
@@ -198,6 +204,7 @@ export class ResolveService {
     filePath: string,
     fullDiff: string,
     rootCause: string,
+    modelKey?: string,
   ): Promise<string | false> {
     this.logger.log(`Trying strategy 1 (fuzz=2) for ${filePath}`);
     let result = applyPatch(content, patch, { fuzzFactor: 2 });
@@ -221,7 +228,7 @@ export class ResolveService {
     }
 
     this.logger.log(`Trying strategy 4 (LLM) for ${filePath}`);
-    result = await this.applyWithLlm(content, filePath, fullDiff, rootCause);
+    result = await this.applyWithLlm(content, filePath, fullDiff, rootCause, modelKey);
     if (result !== false) {
       this.logger.log(`Strategy 4 (LLM) succeeded`);
       return result;
@@ -314,18 +321,20 @@ export class ResolveService {
     filePath: string,
     diff: string,
     rootCause: string,
+    modelKey?: string,
   ): Promise<string | false> {
     try {
-      const raw = await this.llm.chat([
-        {
-          role: 'system',
-          content: `You are a precise code editor. Apply the given fix to the file.
+      const raw = await this.llm.chat(
+        [
+          {
+            role: 'system',
+            content: `You are a precise code editor. Apply the given fix to the file.
 Return ONLY the raw file content — absolutely no markdown code fences, no explanations, no "Here is the modified file:" prefix.
 Start your response with the first character of the file.`,
-        },
-        {
-          role: 'user',
-          content: `File: ${filePath}
+          },
+          {
+            role: 'user',
+            content: `File: ${filePath}
 Bug: ${rootCause}
 
 Diff to apply:
@@ -333,8 +342,11 @@ ${diff}
 
 Current file:
 ${content}`,
-        },
-      ]);
+          },
+        ],
+        false,
+        modelKey,
+      );
 
       if (!raw || raw.trim().length < 10) {
         this.logger.warn(`LLM returned empty/tiny response for ${filePath}`);

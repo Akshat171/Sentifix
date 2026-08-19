@@ -14,6 +14,8 @@ import { SlackController } from './slack.controller';
 import { SlackOAuthController } from './slack-oauth.controller';
 import { SlackOAuthService } from './slack-oauth.service';
 import { SlackService } from './slack.service';
+import { LlmModule } from '../llm/llm.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -23,6 +25,8 @@ import { SlackService } from './slack.service';
     GithubModule,
     IndexingModule,
     QuotaModule,
+    LlmModule,
+    BillingModule,
   ],
   controllers: [SlackController, SlackOAuthController],
   providers: [SlackService, SlackIngestionService, SlackOAuthService],

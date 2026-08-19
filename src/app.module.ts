@@ -16,6 +16,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SetupModule } from './setup/setup.module';
 import { SlackModule } from './slack/slack.module';
 import { LandingModule } from './landing/landing.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { LandingModule } from './landing/landing.module';
     SetupModule,
     SlackModule,
     LandingModule,
+    AdminModule,
   ],
   providers: [
     // Rate limiting applied globally; webhook controllers opt out with @SkipThrottle()

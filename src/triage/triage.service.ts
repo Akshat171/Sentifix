@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
-import { AgentPipeline } from '../agent/agent.pipeline';
-import { EvalJudge } from '../eval/eval.judge';
+import { TriageRunner } from '../agent/triage-runner.service';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
 import { EvalResult } from '../persistence/entities/eval-result.entity';
@@ -12,6 +12,11 @@ import { Run } from '../persistence/entities/run.entity';
 import { TriageJobPayload } from '../queue/queue.producer';
 import { QuotaService } from '../quota/quota.service';
 import { DataSource } from 'typeorm';
+import { TenantModelService } from '../llm/tenant-model.service';
+import { AccountService } from '../billing/account.service';
+import { formatCredits } from '../billing/pricing';
+import { InsufficientCreditsError } from '../agent/triage-runner.service';
+import { LowBalanceService } from '../billing/low-balance.service';
 
 /**
  * Tenant scope for read/act operations. `undefined` = unrestricted (self-host or
@@ -22,6 +27,7 @@ export type TenantScope = number[] | undefined;
 @Injectable()
 export class TriageService {
   private readonly logger = new Logger(TriageService.name);
+  private readonly billingEnabled: boolean;
 
   constructor(
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
@@ -29,13 +35,18 @@ export class TriageService {
     @InjectRepository(EvalResult) private readonly evalRepo: Repository<EvalResult>,
     @InjectRepository(InstallationRepository)
     private readonly installRepoMap: Repository<InstallationRepository>,
-    private readonly pipeline: AgentPipeline,
-    private readonly judge: EvalJudge,
+    private readonly runner: TriageRunner,
     private readonly github: GithubService,
     private readonly indexingJob: IndexingJob,
     private readonly quota: QuotaService,
+    private readonly tenantModels: TenantModelService,
+    private readonly accounts: AccountService,
+    private readonly lowBalance: LowBalanceService,
     private readonly dataSource: DataSource,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.billingEnabled = config.get<boolean>('BILLING_ENABLED') === true;
+  }
 
   async orchestrate(job: TriageJobPayload): Promise<void> {
     const issue = await this.issueRepo.findOne({ where: { id: job.issueId } });
@@ -72,20 +83,32 @@ export class TriageService {
       // Auto-index if repo has no chunks yet — ensures RAG always has content
       await this.ensureIndexed(job.repoFullName, issue.githubCommentId, job.githubIssueNumber);
 
-      const output = await this.pipeline.run({
-        issueId: issue.id,
-        repoFullName: job.repoFullName,
-        title: issue.title,
-        body: issue.body,
-      });
+      const models = await this.tenantModels.forRepo(job.repoFullName);
+      // Only touch the billing tables when billing is on. Resolving an account
+      // unconditionally would make every triage depend on schema that a
+      // billing-disabled deployment has no reason to have.
+      const account = this.billingEnabled ? await this.accounts.forRepo(job.repoFullName) : null;
+      this.logger.log(
+        `Triaging ${job.repoFullName} on model ${models.chat}` +
+          (account ? ` (account ${account.id})` : ''),
+      );
 
-      const evalOutput = await this.judge.evaluate({
-        runId: run.id,
-        issue: { title: issue.title, body: issue.body },
-        classification: output.classification as unknown as Record<string, unknown>,
-        diagnosis: output.diagnosis as unknown as Record<string, unknown>,
-        proposedDiff: output.proposedDiff,
-      });
+      const {
+        output,
+        evaluation: evalOutput,
+        modelKey,
+        escalated,
+      } = await this.runner.run(
+        run.id,
+        {
+          issueId: issue.id,
+          repoFullName: job.repoFullName,
+          title: issue.title,
+          body: issue.body,
+          models,
+        },
+        account?.id,
+      );
 
       await this.evalRepo.save(
         this.evalRepo.create({
@@ -102,6 +125,8 @@ export class TriageService {
       run.classificationResult = output.classification as unknown as Record<string, unknown>;
       run.diagnosisResult = output.diagnosis as unknown as Record<string, unknown>;
       run.proposedDiff = output.proposedDiff;
+      run.modelKey = modelKey;
+      run.escalated = escalated;
       run.status = 'completed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
@@ -130,10 +155,45 @@ export class TriageService {
       commentAction.catch((err: Error) =>
         this.logger.error(`GitHub comment failed: ${err.message}`),
       );
+
+      // Best-effort: a missed warning must never fail a triage that succeeded.
+      const warning = account
+        ? await this.lowBalance.checkAndClaim(account.id).catch(() => null)
+        : null;
+      if (warning) {
+        await this.github
+          .postNotice(
+            job.repoFullName,
+            job.githubIssueNumber,
+            null,
+            this.lowBalance.format(warning),
+          )
+          .catch(() => undefined);
+      }
     } catch (err) {
       run.status = 'failed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
+
+      if (err instanceof InsufficientCreditsError) {
+        // Out of credit is a billing state, not a fault: tell the customer how to
+        // fix it and stop, rather than surfacing a stack trace or retrying.
+        this.logger.warn(`Run ${run.id} halted — account out of credits`);
+        await this.github.postNotice(
+          job.repoFullName,
+          job.githubIssueNumber,
+          issue.githubCommentId,
+          [
+            '## Sentifix — out of credits',
+            '',
+            `This account has ${formatCredits(err.availableMicro)} credits left and this triage needs about ${formatCredits(err.requiredMicro)}.`,
+            '',
+            'Top up to resume automated triage. Nothing was charged for this issue.',
+          ].join('\n'),
+        );
+        return;
+      }
+
       this.logger.error(`Triage failed for run ${run.id}: ${(err as Error).message}`);
       throw err;
     }

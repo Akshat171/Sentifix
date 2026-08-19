@@ -26,7 +26,8 @@
     "eval": "ts-node -r tsconfig-paths/register scripts/eval.ts",
     "embed:ab": "ts-node -r tsconfig-paths/register scripts/embed-ab.ts",
     "index:local": "ts-node -r tsconfig-paths/register scripts/index-local.ts",
-    "simulate:webhook": "bash scripts/simulate-webhook.sh"
+    "simulate:webhook": "bash scripts/simulate-webhook.sh",
+    "check:models": "ts-node -r tsconfig-paths/register scripts/check-models.ts"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.32.0",
@@ -56,6 +57,7 @@
     "pg": "^8.13.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "stripe": "^22.5.0",
     "typeorm": "^0.3.20"
   },
   "devDependencies": {

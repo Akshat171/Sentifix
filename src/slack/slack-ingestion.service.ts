@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { AgentPipeline } from '../agent/agent.pipeline';
-import { EvalJudge } from '../eval/eval.judge';
+import { TriageRunner } from '../agent/triage-runner.service';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
 import { QuotaService } from '../quota/quota.service';
@@ -11,6 +10,11 @@ import { Issue } from '../persistence/entities/issue.entity';
 import { Run } from '../persistence/entities/run.entity';
 import { EvalResult } from '../persistence/entities/eval-result.entity';
 import { SlackService } from './slack.service';
+import { TenantModelService } from '../llm/tenant-model.service';
+import { AccountService } from '../billing/account.service';
+import { formatCredits } from '../billing/pricing';
+import { InsufficientCreditsError } from '../agent/triage-runner.service';
+import { LowBalanceService } from '../billing/low-balance.service';
 
 export interface SlackMentionEvent {
   type: string;
@@ -26,21 +30,25 @@ export interface SlackMentionEvent {
 export class SlackIngestionService {
   private readonly logger = new Logger(SlackIngestionService.name);
   private readonly defaultRepo: string;
+  private readonly billingEnabled: boolean;
 
   constructor(
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
     @InjectRepository(Run) private readonly runRepo: Repository<Run>,
     @InjectRepository(EvalResult) private readonly evalRepo: Repository<EvalResult>,
-    private readonly pipeline: AgentPipeline,
-    private readonly judge: EvalJudge,
+    private readonly runner: TriageRunner,
     private readonly github: GithubService,
     private readonly slackService: SlackService,
     private readonly indexingJob: IndexingJob,
     private readonly quota: QuotaService,
+    private readonly tenantModels: TenantModelService,
+    private readonly accounts: AccountService,
+    private readonly lowBalance: LowBalanceService,
     private readonly dataSource: DataSource,
     config: ConfigService,
   ) {
     this.defaultRepo = config.get<string>('SLACK_DEFAULT_REPO') ?? '';
+    this.billingEnabled = config.get<boolean>('BILLING_ENABLED') === true;
   }
 
   async handleMention(event: SlackMentionEvent): Promise<void> {
@@ -119,20 +127,26 @@ export class SlackIngestionService {
     );
 
     try {
-      const output = await this.pipeline.run({
-        issueId: issue.id,
-        repoFullName,
-        title: issue.title,
-        body: cleanText,
-      });
+      const models = await this.tenantModels.forSlackTeam(event.team);
+      const account = this.billingEnabled ? await this.accounts.forSlackTeam(event.team) : null;
+      this.logger.log(`Triaging Slack request for ${repoFullName} on model ${models.chat}`);
 
-      const evalOutput = await this.judge.evaluate({
-        runId: run.id,
-        issue: { title: issue.title, body: cleanText },
-        classification: output.classification as unknown as Record<string, unknown>,
-        diagnosis: output.diagnosis as unknown as Record<string, unknown>,
-        proposedDiff: output.proposedDiff,
-      });
+      const {
+        output,
+        evaluation: evalOutput,
+        modelKey,
+        escalated,
+      } = await this.runner.run(
+        run.id,
+        {
+          issueId: issue.id,
+          repoFullName,
+          title: issue.title,
+          body: cleanText,
+          models,
+        },
+        account?.id,
+      );
 
       await this.evalRepo.save(
         this.evalRepo.create({
@@ -149,6 +163,8 @@ export class SlackIngestionService {
       run.classificationResult = output.classification as unknown as Record<string, unknown>;
       run.diagnosisResult = output.diagnosis as unknown as Record<string, unknown>;
       run.proposedDiff = output.proposedDiff;
+      run.modelKey = modelKey;
+      run.escalated = escalated;
       run.status = 'completed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
@@ -184,10 +200,30 @@ export class SlackIngestionService {
           repoFullName,
         });
       }
+      const warning = account
+        ? await this.lowBalance.checkAndClaim(account.id).catch(() => null)
+        : null;
+      if (warning) {
+        await this.slackService
+          .postNotice(event.channel, threadTs, event.team, this.lowBalance.format(warning))
+          .catch(() => undefined);
+      }
     } catch (err) {
       run.status = 'failed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
+
+      if (err instanceof InsufficientCreditsError) {
+        this.logger.warn('Slack run halted — account out of credits');
+        await this.slackService.postNotice(
+          event.channel,
+          threadTs,
+          event.team,
+          `Out of credits — ${formatCredits(err.availableMicro)} left, about ${formatCredits(err.requiredMicro)} needed. Top up to resume triage.`,
+        );
+        return;
+      }
+
       this.logger.error(`Slack triage failed: ${(err as Error).message}`);
     }
   }

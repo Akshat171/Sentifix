@@ -38,6 +38,11 @@ export class SlackInstallation {
   @Column({ type: 'varchar', nullable: true })
   defaultRepo: string | null; // optional per-workspace fallback repo
 
+  // Catalog key from src/llm/model-catalog.ts. Null = fall back to the
+  // deployment default (DEFAULT_CHAT_MODEL).
+  @Column({ type: 'varchar', nullable: true })
+  modelKey: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

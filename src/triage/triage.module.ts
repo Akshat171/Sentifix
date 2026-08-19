@@ -15,6 +15,7 @@ import { QueueConsumer } from '../queue/queue.consumer';
 import { ResolveService } from './resolve.service';
 import { TriageController } from './triage.controller';
 import { TriageService } from './triage.service';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TriageService } from './triage.service';
     LlmModule,
     IndexingModule,
     QuotaModule,
+    BillingModule,
   ],
   providers: [TriageService, ResolveService],
   controllers: [TriageController, QueueConsumer],

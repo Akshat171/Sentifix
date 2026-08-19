@@ -34,6 +34,17 @@ export class Run {
   @Column('text', { nullable: true })
   proposedDiff: string | null;
 
+  // Catalog key that produced the diff above. Recorded per run so per-tenant
+  // cost and quality can be attributed to a specific model after the fact.
+  @Column({ type: 'varchar', nullable: true })
+  modelKey: string | null;
+
+  // True when the first attempt scored below the threshold and the fix was
+  // retried on a stronger model. The rate of this is the signal for whether
+  // a tenant is on the right default tier.
+  @Column({ default: false })
+  escalated: boolean;
+
   @OneToMany(() => EvalResult, (evalResult) => evalResult.run)
   evalResults: EvalResult[];
 

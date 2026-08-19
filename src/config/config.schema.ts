@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { MODEL_KEYS } from '../llm/model-catalog';
 
 export const configSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
@@ -9,35 +10,60 @@ export const configSchema = Joi.object({
   DB_SYNCHRONIZE: Joi.boolean().default(false),
   REDIS_URL: Joi.string().uri().optional(),
   RABBITMQ_URL: Joi.string().uri().required(),
-  // Which vendor serves chat/completions. Embeddings always use OpenAI — Anthropic
-  // ships no embedding model — so OPENAI_API_KEY stays required either way.
-  LLM_PROVIDER: Joi.string().valid('openai', 'bedrock').default('openai'),
-  // Claude on Amazon Bedrock. Credentials resolve through the standard AWS chain
-  // (instance role on EC2), so there is no key to set here. Model IDs carry the
-  // `anthropic.` prefix, and access must be granted per-region in the Bedrock console.
-  AWS_REGION: Joi.string().when('LLM_PROVIDER', {
-    is: 'bedrock',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
-  BEDROCK_CHAT_MODEL: Joi.string().default('anthropic.claude-sonnet-5'),
-  // Kept stronger than BEDROCK_CHAT_MODEL for the same reason as the OpenAI pair below.
-  BEDROCK_JUDGE_MODEL: Joi.string().default('anthropic.claude-opus-5'),
-  BEDROCK_RERANK_MODEL: Joi.string().optional(), // defaults to BEDROCK_CHAT_MODEL
+  // Model keys from src/llm/model-catalog.ts, not vendor model IDs. The vendor is
+  // looked up per call from the key, so one deployment serves OpenAI and Bedrock
+  // tenants at once. Embeddings always use OpenAI — Anthropic ships no embedding
+  // model — so OPENAI_API_KEY stays required either way.
+  DEFAULT_CHAT_MODEL: Joi.string()
+    .valid(...MODEL_KEYS)
+    .default('gpt-5.6-luna'),
+  DEFAULT_RERANK_MODEL: Joi.string()
+    .valid(...MODEL_KEYS)
+    .optional(),
+  // Pinned deployment-wide and never client-selectable: eval scores are only
+  // comparable across tenants if every run is graded by the same judge.
+  JUDGE_MODEL: Joi.string()
+    .valid(...MODEL_KEYS)
+    .default('gpt-5.6-sol'),
+  // Escalation: when the judge scores a fix below ESCALATION_THRESHOLD, retry the
+  // fix once on ESCALATION_MODEL and keep whichever diff scored higher. Off by
+  // default because on a poorly-tuned deployment it doubles the cost of a run.
+  ESCALATION_ENABLED: Joi.boolean().default(false),
+  ESCALATION_MODEL: Joi.string()
+    .valid(...MODEL_KEYS)
+    .optional(),
+  ESCALATION_THRESHOLD: Joi.number().min(0).max(1).default(0.6),
+  // Billing. 1 credit = USD 0.01 of customer-facing value. CREDIT_MARKUP is the
+  // multiple of vendor token cost you charge, applied once at settle time.
+  // Admin API fails closed: with neither ADMIN_API_KEY nor API_KEY set, every
+  // /admin route 401s rather than falling open the way ApiKeyGuard does.
+  ADMIN_API_KEY: Joi.string().optional(),
+  BILLING_ENABLED: Joi.boolean().default(false),
+  CREDIT_MARKUP: Joi.number().min(1).default(2),
+  FREE_GRANT_CREDITS: Joi.number().min(0).default(500),
+  // Worst-case token budget used to size the pre-run hold, not a cap on the run.
+  ESTIMATE_INPUT_TOKENS: Joi.number().default(80000),
+  ESTIMATE_OUTPUT_TOKENS: Joi.number().default(8000),
+  HOLD_TTL_MS: Joi.number().default(15 * 60 * 1000),
+  // Stripe. Credits are granted by the webhook, never by the success redirect,
+  // so STRIPE_WEBHOOK_SECRET is as load-bearing as the secret key itself.
+  STRIPE_SECRET_KEY: Joi.string().optional(),
+  STRIPE_WEBHOOK_SECRET: Joi.string().optional(),
+  LOW_BALANCE_THRESHOLD_CREDITS: Joi.number().min(0).default(250),
+  LOW_BALANCE_COOLDOWN_HOURS: Joi.number().min(1).default(24),
+  // Required only once a Bedrock-backed model is actually selected; the client is
+  // built lazily. Credentials resolve through the standard AWS chain (instance
+  // role on EC2), and model access must be granted per-region in the console.
+  AWS_REGION: Joi.string().optional(),
   // Claude requires an explicit output ceiling, and on Opus-tier models thinking
   // shares this budget with the response — leave headroom or JSON replies truncate.
   BEDROCK_MAX_TOKENS: Joi.number().default(16000),
   OPENAI_API_KEY: Joi.string().required(),
-  OPENAI_CHAT_MODEL: Joi.string().default('gpt-4o-mini'),
-  // Model used by the LLM-as-judge eval. Defaults to a different, stronger model
-  // than OPENAI_CHAT_MODEL so the judge doesn't grade its own output (self-preference bias).
-  OPENAI_JUDGE_MODEL: Joi.string().default('gpt-4o'),
   OPENAI_EMBEDDING_MODEL: Joi.string().default('text-embedding-3-small'),
   // Precision stage: after retrieval casts a wide net, an LLM reranker scores each
   // candidate chunk for relevance and keeps only the top RERANK_TOP_N for the fix prompt.
   RERANK_ENABLED: Joi.boolean().default(true),
   RERANK_TOP_N: Joi.number().default(8),
-  OPENAI_RERANK_MODEL: Joi.string().optional(), // defaults to OPENAI_CHAT_MODEL
   GITHUB_WEBHOOK_SECRET: Joi.string().required(),
   GITHUB_TOKEN: Joi.string().optional(),
   // Which issues to auto-triage:

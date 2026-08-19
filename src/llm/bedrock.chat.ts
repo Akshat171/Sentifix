@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { AnthropicBedrockMantle } from '@anthropic-ai/bedrock-sdk';
-import type { ChatMessage } from './chat.types';
+import type { ChatMessage, ChatResult } from './chat.types';
 
 /**
  * Claude chat via Amazon Bedrock.
@@ -30,7 +30,7 @@ export class BedrockChat {
     this.client = new AnthropicBedrockMantle({ awsRegion: region });
   }
 
-  async chat(messages: ChatMessage[], jsonMode = false, model?: string): Promise<string> {
+  async chat(messages: ChatMessage[], jsonMode = false, model?: string): Promise<ChatResult> {
     const system = messages
       .filter((m) => m.role === 'system')
       .map((m) => m.content)
@@ -73,7 +73,13 @@ export class BedrockChat {
       .map((block) => block.text)
       .join('');
 
-    return jsonMode ? extractJson(text) : text;
+    return {
+      text: jsonMode ? extractJson(text) : text,
+      // Defensive: a provider that omits usage must not crash a run, but an
+      // unmetered call would silently be free — the zero is visible in usage_records.
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+    };
   }
 }
 

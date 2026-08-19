@@ -7,6 +7,11 @@ import { InstallationRepository } from './entities/installation-repository.entit
 import { Issue } from './entities/issue.entity';
 import { Run } from './entities/run.entity';
 import { SlackInstallation } from './entities/slack-installation.entity';
+import { Account } from './entities/account.entity';
+import { AccountLink } from './entities/account-link.entity';
+import { CreditHold } from './entities/credit-hold.entity';
+import { CreditLedgerEntry } from './entities/credit-ledger.entity';
+import { UsageRecord } from './entities/usage-record.entity';
 
 @Module({
   imports: [
@@ -23,6 +28,11 @@ import { SlackInstallation } from './entities/slack-installation.entity';
             Installation,
             InstallationRepository,
             SlackInstallation,
+            Account,
+            AccountLink,
+            CreditLedgerEntry,
+            CreditHold,
+            UsageRecord,
           ],
           // Entity tables have no migrations — synchronize creates them.
           // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).

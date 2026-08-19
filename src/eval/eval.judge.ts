@@ -44,8 +44,8 @@ export class EvalJudge {
     private readonly llm: LlmProvider,
     private readonly config: ConfigService,
   ) {
-    // Resolved by the provider so the judge follows LLM_PROVIDER without
-    // needing to know which vendor's model names are in play.
+    // Pinned deployment-wide, never per-tenant: eval scores are only
+    // comparable across runs if every run was graded by the same judge.
     this.judgeModel = this.llm.judgeModel;
   }
 
