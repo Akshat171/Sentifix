@@ -38,6 +38,9 @@ export const configSchema = Joi.object({
   // Admin API fails closed: with neither ADMIN_API_KEY nor API_KEY set, every
   // /admin route 401s rather than falling open the way ApiKeyGuard does.
   ADMIN_API_KEY: Joi.string().optional(),
+  // After this many consecutive recent failures on one issue, stop retrying it.
+  // 0 disables the breaker. Guards against paying a provider to fail repeatedly.
+  FAILURE_CIRCUIT_LIMIT: Joi.number().min(0).default(5),
   BILLING_ENABLED: Joi.boolean().default(false),
   CREDIT_MARKUP: Joi.number().min(1).default(2),
   FREE_GRANT_CREDITS: Joi.number().min(0).default(500),

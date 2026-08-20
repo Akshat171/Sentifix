@@ -41,6 +41,7 @@ export interface RepoOverview {
 export class TriageService {
   private readonly logger = new Logger(TriageService.name);
   private readonly billingEnabled: boolean;
+  private readonly failureCircuitLimit: number;
 
   constructor(
     @InjectRepository(Issue) private readonly issueRepo: Repository<Issue>,
@@ -59,6 +60,7 @@ export class TriageService {
     config: ConfigService,
   ) {
     this.billingEnabled = config.get<boolean>('BILLING_ENABLED') === true;
+    this.failureCircuitLimit = Number(config.get<number>('FAILURE_CIRCUIT_LIMIT') ?? 5);
   }
 
   async orchestrate(job: TriageJobPayload): Promise<void> {
@@ -84,6 +86,18 @@ export class TriageService {
         job.githubIssueNumber,
         issue.githubCommentId,
         body,
+      );
+      return;
+    }
+
+    // Defence in depth against a failure that repeats. Even with requeue fixed,
+    // anything that re-enqueues the same issue — a webhook retry, a stuck
+    // upstream, a manual loop — would otherwise keep paying the provider to fail
+    // the same way. Bound it by recent history rather than trusting the caller.
+    if (await this.tripped(issue.id)) {
+      this.logger.error(
+        `Circuit open for issue ${issue.githubIssueNumber}: ` +
+          `${this.failureCircuitLimit} consecutive failures in the last hour — refusing to retry`,
       );
       return;
     }
@@ -396,6 +410,29 @@ export class TriageService {
     if (scope.length === 0) return [];
     const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
     return [...new Set(rows.map((r) => r.repoFullName))];
+  }
+
+  /**
+   * True when this issue has failed repeatedly and recently, so another attempt
+   * is very unlikely to behave differently. Counts only the most recent runs, so
+   * one success re-closes the circuit without any extra bookkeeping.
+   */
+  private async tripped(issueId: string): Promise<boolean> {
+    if (this.failureCircuitLimit <= 0) return false;
+
+    const recent = await this.runRepo.find({
+      where: { issue: { id: issueId } },
+      order: { startedAt: 'DESC' },
+      take: this.failureCircuitLimit,
+      relations: [],
+    });
+
+    return (
+      recent.length >= this.failureCircuitLimit &&
+      recent.every(
+        (r) => r.status === 'failed' && r.startedAt.getTime() > Date.now() - 60 * 60 * 1000,
+      )
+    );
   }
 
   /** Throw unless the repo is visible to the scope (no-op when unrestricted). */

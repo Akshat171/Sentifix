@@ -14,6 +14,20 @@ export class QueueConsumer {
     this.logger.log(
       `Received triage job for issue #${payload.githubIssueNumber} in ${payload.repoFullName}`,
     );
-    await this.triage.orchestrate(payload);
+    try {
+      await this.triage.orchestrate(payload);
+    } catch (err) {
+      // Swallow deliberately. orchestrate() has already marked the run failed
+      // and told the user; letting the error propagate makes the RabbitMQ
+      // transport requeue the message, which redelivers it, creates another run
+      // row, and calls the model again — forever. That loop produced thousands
+      // of runs for a handful of issues and burned the provider quota it was
+      // failing on. A bounded retry with a dead-letter queue would be fine;
+      // unbounded requeue never is.
+      this.logger.error(
+        `Triage job for issue #${payload.githubIssueNumber} in ${payload.repoFullName} ` +
+          `failed and will NOT be requeued: ${(err as Error).message}`,
+      );
+    }
   }
 }
