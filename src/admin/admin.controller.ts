@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AccountService } from '../billing/account.service';
 import { LedgerService } from '../billing/ledger.service';
 import { costMicro, formatCredits, MICRO_PER_CREDIT } from '../billing/pricing';
@@ -6,6 +15,7 @@ import { selectableModels } from '../llm/model-catalog';
 import { LinkProvider, TenantModelService } from '../llm/tenant-model.service';
 import { InsightsService } from '../billing/insights.service';
 import { AdminGuard } from './admin.guard';
+import { AccessService } from '../auth/access.service';
 
 /** A representative run, used only to show relative burn rate between tiers. */
 const SAMPLE_RUN = { inputTokens: 80_000, outputTokens: 8_000 };
@@ -34,6 +44,7 @@ export class AdminController {
     private readonly accounts: AccountService,
     private readonly ledger: LedgerService,
     private readonly insights: InsightsService,
+    private readonly access: AccessService,
   ) {}
 
   /**
@@ -54,6 +65,24 @@ export class AdminController {
         note: '80k in / 8k out at 2x markup — indicative, not a quote',
       };
     });
+  }
+
+  /** Who is waiting, who is in, who was turned away. */
+  @Get('access')
+  async accessList() {
+    const [grants, counts] = await Promise.all([this.access.list(), this.access.counts()]);
+    return { counts, grants };
+  }
+
+  @Patch('access/:login')
+  async decideAccess(
+    @Param('login') login: string,
+    @Body() body: { status: 'approved' | 'denied'; note?: string },
+  ) {
+    if (body.status !== 'approved' && body.status !== 'denied') {
+      throw new BadRequestException("status must be 'approved' or 'denied'");
+    }
+    return this.access.decide(login, body.status, 'admin-api', body.note);
   }
 
   @Get('tenants')

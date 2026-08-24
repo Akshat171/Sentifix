@@ -1,5 +1,12 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AccessService } from './access.service';
 import { SessionService } from './session.service';
 
 /**
@@ -15,12 +22,13 @@ export class SessionGuard implements CanActivate {
   constructor(
     config: ConfigService,
     private readonly session: SessionService,
+    private readonly access: AccessService,
   ) {
     this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
     this.apiKey = config.get<string>('API_KEY');
   }
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     if (!this.authEnabled) return true; // open self-host mode
 
     const req = context
@@ -35,6 +43,14 @@ export class SessionGuard implements CanActivate {
 
     const session = this.session.getSession(req);
     if (!session) throw new UnauthorizedException('Login required');
+
+    // Checked per request against the table, not read from the cookie: a claim
+    // baked into a signed session would keep working until the cookie expired,
+    // so revoking someone would not actually revoke them.
+    if (!(await this.access.isApproved(session.login))) {
+      throw new ForbiddenException('Your access request is still pending approval');
+    }
+
     req.session = session;
     return true;
   }

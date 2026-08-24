@@ -1,0 +1,34 @@
+{
+  "_provenance": "Real values from run 90839933-f66a-457a-9275-3e9651b03f79 (Akshat171/Sentifix, completed 2026-07-01), read from the local dashboard at /dashboard/issues and from GET /triage/issues/:id/runs. The input issue was the demo payload in scripts/test-pipeline.ts, so the file paths belong to that fictional app; everything else here is genuine model output.",
+  "issue": {
+    "title": "getting this in prod:",
+    "source": "slack",
+    "repoFullName": "Akshat171/Sentifix",
+    "error": "TypeError: Cannot read properties of undefined (reading 'userId')"
+  },
+  "classification": {
+    "severity": "high",
+    "category": "crash",
+    "components": ["AuthService"],
+    "summary": "The error 'TypeError: Cannot read properties of undefined (reading 'userId')' indicates that there is an attempt to access a property on an undefined object. This issue could lead to application crashes or failures in authentication processes, particularly in a production environment, which is critical for user access and security."
+  },
+  "diagnosis": {
+    "rootCause": "The 'userId' property is being accessed from an undefined object within the 'validateOAuthToken' method.",
+    "detail": "The error indicates that the object expected to hold the OAuth token details is undefined, likely due to an incorrect or missing token being passed to the 'validateOAuthToken' method. If the token is invalid or not formatted correctly, the object that is supposed to be parsed might not be initialized, which would lead to an attempt to access 'userId' on an undefined object.",
+    "relevantFiles": [
+      "src/auth/auth.service.ts",
+      "src/auth/auth.controller.ts",
+      "src/auth/token.service.ts"
+    ]
+  },
+  "inbox": [
+    { "title": "[Security] Hardcoded default JWT secret key allows token forgery", "repo": "Akshat171/ResolveAI-BE", "number": 1, "severity": "critical" },
+    { "title": "[Security] No rate limiting on /signup, /login, /refresh allows brute force", "repo": "Akshat171/ResolveAI-BE", "number": 4, "severity": "high" },
+    { "title": "[Security] Specific 404 error messages enable resource enumeration", "repo": "Akshat171/ResolveAI-BE", "number": 6, "severity": "medium" },
+    { "title": "[Performance] retrieve_relevant_chunks() makes duplicate OpenAI embedding calls with no caching", "repo": "Akshat171/ResolveAI-BE", "number": 8, "severity": "high" },
+    { "title": "[Enhancement] Application starts without verifying pending Alembic migrations exist", "repo": "Akshat171/ResolveAI-BE", "number": 2, "severity": "low" },
+    { "title": "res.json() does not set Content-Type charset when using custom replacer", "repo": "expressjs/express", "number": 101, "severity": "medium" },
+    { "title": "TypeError: Cannot read properties of undefined (reading 'userId')", "repo": "Akshat171/Sentifix", "number": 42, "severity": "high" }
+  ],
+  "stats": { "repositories": 4, "issuesTriaged": 9, "triageRuns": 979, "avgFixScore": 0.65 }
+}

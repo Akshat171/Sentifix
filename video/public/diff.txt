@@ -1,0 +1,51 @@
+```diff
+--- a/src/auth/auth.service.ts
++++ b/src/auth/auth.service.ts
+@@ -84,7 +84,10 @@
+     const tokenDetails = this.tokenService.validateToken(token);
+     if (!tokenDetails) {
+         throw new Error('Invalid token');
+     }
+-    const userId = tokenDetails.userId;
++    
++    if (!tokenDetails.userId) {
++        throw new Error('User ID not found in token details');
++    }
+     return userId;
+ }
+
+--- a/src/auth/auth.controller.ts
++++ b/src/auth/auth.controller.ts
+@@ -50,7 +50,10 @@
+     const token = req.headers['authorization']?.split(' ')[1];
+     if (!token) {
+         return res.status(401).send('Token is required');
+     }
+-    const userId = await this.authService.validateOAuthToken(token);
++    
++    const userId = await this.authService.validateOAuthToken(token).catch((error) => {
++        return res.status(401).send(error.message);
++    });
+ 
+     // Proceed with userId
+     res.status(200).send({ userId });
+ }
+
+--- a/src/auth/token.service.ts
++++ b/src/auth/token.service.ts
+@@ -22,7 +22,10 @@
+     try {
+         const decodedToken = this.decodeToken(token);
+         if (!decodedToken) {
+             return null;
+         }
+-        return decodedToken;
++        
++        if (!decodedToken.userId) {
++            throw new Error('Decoded token does not have userId');
++        }
+     } catch (error) {
+         return null;
+     }
+ }
+```

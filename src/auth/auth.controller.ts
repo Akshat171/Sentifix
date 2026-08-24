@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import type { HttpReply, HttpRequest } from './http.types';
 import { GithubOAuthService } from './github-oauth.service';
 import { SessionService } from './session.service';
+import { AccessService } from './access.service';
 
 const SESSION_TTL_SEC = 7 * 24 * 3600;
 
@@ -15,6 +16,7 @@ export class AuthController {
   constructor(
     private readonly oauth: GithubOAuthService,
     private readonly session: SessionService,
+    private readonly access: AccessService,
     config: ConfigService,
   ) {
     this.secure = (config.get<string>('APP_BASE_URL') ?? '').startsWith('https://');
@@ -51,6 +53,15 @@ export class AuthController {
       reply.code(302).redirect('/dashboard?error=oauth_user');
       return;
     }
+    // Record the attempt before minting anything, so someone who is turned away
+    // still lands in the queue for you to review.
+    const standing = await this.access.recordAndCheck(login);
+    if (standing !== 'approved') {
+      this.logger.log(`Login blocked for ${login}: access ${standing}`);
+      reply.code(302).redirect(`/access?status=${standing}`);
+      return;
+    }
+
     const installationIds = await this.oauth.getInstallationIds(token);
 
     const value = this.session.sign({

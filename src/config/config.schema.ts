@@ -85,6 +85,12 @@ export const configSchema = Joi.object({
   // signed-in user's installations. Off (default) = open single-tenant self-host.
   // When on, needs SESSION_SECRET, APP_BASE_URL, and GITHUB_APP_CLIENT_ID/SECRET.
   DASHBOARD_AUTH: Joi.boolean().default(false),
+  // Who may use the product once signed in. 'open' (default) keeps self-host
+  // behaviour: any GitHub login that authenticates is a user. 'approval' puts
+  // new logins in a queue you review. Set ACCESS_BOOTSTRAP_LOGINS to your own
+  // login first, or nobody can approve anyone — including you.
+  ACCESS_MODE: Joi.string().valid('open', 'approval').default('open'),
+  ACCESS_BOOTSTRAP_LOGINS: Joi.string().allow('').default(''),
   SESSION_SECRET: Joi.string().optional(), // HMAC secret for signing the session cookie
   APP_BASE_URL: Joi.string().uri().optional(), // public base URL, e.g. https://sentifix.dev
   // GitHub App (optional — enables one-click install flow)

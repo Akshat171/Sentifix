@@ -12,6 +12,7 @@ import { AccountLink } from './entities/account-link.entity';
 import { CreditHold } from './entities/credit-hold.entity';
 import { CreditLedgerEntry } from './entities/credit-ledger.entity';
 import { UsageRecord } from './entities/usage-record.entity';
+import { AccessGrant } from './entities/access-grant.entity';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { UsageRecord } from './entities/usage-record.entity';
             CreditLedgerEntry,
             CreditHold,
             UsageRecord,
+            AccessGrant,
           ],
           // Entity tables have no migrations — synchronize creates them.
           // On in dev always; in prod opt-in via DB_SYNCHRONIZE (set by the deploy template).
