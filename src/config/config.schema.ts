@@ -40,6 +40,9 @@ export const configSchema = Joi.object({
   ADMIN_API_KEY: Joi.string().optional(),
   // After this many consecutive recent failures on one issue, stop retrying it.
   // 0 disables the breaker. Guards against paying a provider to fail repeatedly.
+  // Free trial length. Access is trial-OR-credits, so the free grant still caps
+  // how much a trial can actually spend. 0 disables trials entirely.
+  TRIAL_DAYS: Joi.number().min(0).default(7),
   FAILURE_CIRCUIT_LIMIT: Joi.number().min(0).default(5),
   BILLING_ENABLED: Joi.boolean().default(false),
   CREDIT_MARKUP: Joi.number().min(1).default(2),

@@ -245,7 +245,6 @@ export class TriageService {
 
     // Update placeholder comment so user knows what's happening
     if (commentId) {
-      const [owner, repo] = repoFullName.split('/');
       await this.dataSource.query('SELECT 1').catch(() => null); // keep connection alive
       this.github.postPlaceholderComment(repoFullName, issueNumber).catch(() => null);
     }

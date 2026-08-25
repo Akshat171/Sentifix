@@ -13,6 +13,7 @@ import { Issue } from '../persistence/entities/issue.entity';
 import { Run } from '../persistence/entities/run.entity';
 import { QueueConsumer } from '../queue/queue.consumer';
 import { ResolveService } from './resolve.service';
+import { PublicApiController } from './public-api.controller';
 import { TriageController } from './triage.controller';
 import { TriageService } from './triage.service';
 import { BillingModule } from '../billing/billing.module';
@@ -30,7 +31,7 @@ import { BillingModule } from '../billing/billing.module';
     BillingModule,
   ],
   providers: [TriageService, ResolveService],
-  controllers: [TriageController, QueueConsumer],
+  controllers: [TriageController, PublicApiController, QueueConsumer],
   exports: [TriageService],
 })
 export class TriageModule {}

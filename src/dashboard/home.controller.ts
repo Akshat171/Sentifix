@@ -110,6 +110,7 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
     <a href="/dashboard" aria-current="page">Repositories</a>
     <a href="/dashboard/issues">Issues</a>
     <a href="/dashboard/usage">Usage</a>
+    <a href="/dashboard/keys">API keys</a>
   </nav>
   ${userBadge}
 </header>

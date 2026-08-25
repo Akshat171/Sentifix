@@ -8,7 +8,12 @@ import { InstallationRepository } from '../persistence/entities/installation-rep
 import { UsageRecord } from '../persistence/entities/usage-record.entity';
 import { AuthModule } from '../auth/auth.module';
 import { AccountService } from './account.service';
+import { ApiKeyController } from './api-key.controller';
 import { BillingController, StripeWebhookController } from './billing.controller';
+import { CustomerKeyGuard } from './customer-key.guard';
+import { ApiKey } from '../persistence/entities/api-key.entity';
+import { ApiKeyService } from './api-key.service';
+import { EntitlementService } from './entitlement.service';
 import { InsightsService } from './insights.service';
 import { LlmModule } from '../llm/llm.module';
 import { LowBalanceService } from './low-balance.service';
@@ -24,12 +29,13 @@ import { LedgerService } from './ledger.service';
       CreditHold,
       CreditLedgerEntry,
       UsageRecord,
+      ApiKey,
       InstallationRepository,
     ]),
     AuthModule,
     LlmModule,
   ],
-  controllers: [BillingController, StripeWebhookController],
+  controllers: [BillingController, StripeWebhookController, ApiKeyController],
   providers: [
     LedgerService,
     AccountService,
@@ -37,7 +43,12 @@ import { LedgerService } from './ledger.service';
     StripeService,
     LowBalanceService,
     InsightsService,
+    ApiKeyService,
+    EntitlementService,
+    CustomerKeyGuard,
   ],
+  // The key services and the guard are exported because TriageModule's public
+  // API controller is guarded by them.
   exports: [
     LedgerService,
     AccountService,
@@ -45,6 +56,9 @@ import { LedgerService } from './ledger.service';
     StripeService,
     LowBalanceService,
     InsightsService,
+    ApiKeyService,
+    EntitlementService,
+    CustomerKeyGuard,
   ],
 })
 export class BillingModule {}

@@ -173,9 +173,9 @@ export class SlackIngestionService {
       let prUrl: string | undefined;
       let prNumber: number | undefined;
       try {
-        const { name: baseBranch, sha } = await this.github.getDefaultBranch(repoFullName);
-        const branchName = `sentifix/slack-${event.channel}-${event.ts.replace('.', '')}`;
-        // PR creation handled by resolve flow — here we just note it's possible
+        // Confirms the repo is reachable before we tell the channel a fix exists.
+        // PR creation itself is handled by the resolve flow, not here.
+        await this.github.getDefaultBranch(repoFullName);
         this.logger.log(`Triage complete for Slack issue, score: ${evalOutput.score.toFixed(2)}`);
       } catch {
         /* PR creation is best-effort */

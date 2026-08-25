@@ -7,6 +7,7 @@ import { AccountLink, LinkProvider } from '../persistence/entities/account-link.
 import { InstallationRepository } from '../persistence/entities/installation-repository.entity';
 import { LedgerService } from './ledger.service';
 import { MICRO_PER_CREDIT } from './pricing';
+import { EntitlementService } from './entitlement.service';
 
 /**
  * Resolves whichever tenant identity a run arrived under to the account that
@@ -27,6 +28,7 @@ export class AccountService {
     @InjectRepository(InstallationRepository)
     private readonly repoMap: Repository<InstallationRepository>,
     private readonly ledger: LedgerService,
+    private readonly entitlement: EntitlementService,
     private readonly dataSource: DataSource,
     config: ConfigService,
   ) {
@@ -49,6 +51,15 @@ export class AccountService {
 
   async forSlackTeam(teamId: string): Promise<Account> {
     return this.resolve('slack', teamId, `slack:${teamId}`);
+  }
+
+  /**
+   * Installation IDs this account owns. This is the tenant boundary for the
+   * public API: derived from the credential, never from caller input.
+   */
+  async installationIdsFor(accountId: string): Promise<number[]> {
+    const links = await this.links.find({ where: { accountId, provider: 'github' } });
+    return links.map((l) => Number(l.externalId)).filter((n) => Number.isInteger(n));
   }
 
   /**
@@ -77,7 +88,15 @@ export class AccountService {
     }
 
     const account = await this.dataSource.transaction(async (tx) => {
-      const created = await tx.save(tx.create(Account, { name, balanceMicro: 0, heldMicro: 0 }));
+      const created = await tx.save(
+        tx.create(Account, {
+          name,
+          balanceMicro: 0,
+          heldMicro: 0,
+          // The clock starts the first time we see them, not when they ask.
+          trialEndsAt: this.entitlement.trialEnd(),
+        }),
+      );
       await tx.insert(AccountLink, { accountId: created.id, provider, externalId });
       return created;
     });

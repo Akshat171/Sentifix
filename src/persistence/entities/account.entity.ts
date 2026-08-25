@@ -31,6 +31,13 @@ export class Account {
   @Column({ type: 'bigint', default: 0, transformer: microTransformer })
   heldMicro: number;
 
+  /**
+   * End of the free trial. Null means no trial was granted (or trials are off).
+   * Access is trial-OR-credits, so this never needs clearing when they pay.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  trialEndsAt: Date | null;
+
   /** When the customer was last told they were running low. Null = never. */
   @Column({ type: 'timestamptz', nullable: true })
   lowBalanceNotifiedAt: Date | null;
