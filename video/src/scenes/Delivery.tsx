@@ -109,6 +109,10 @@ export const Delivery: React.FC = () => {
             opacity: 1 - settle,
             transform: `scale(${1 - settle * 0.06})`,
             flex: 'none',
+            // Collapse the row as it fades; otherwise the invisible cards keep
+            // their space and the dashboard sits under a gap.
+            height: (1 - settle) * (cut === 'vertical' ? 620 : 200),
+            overflow: 'hidden',
           }}
         >
           <Card

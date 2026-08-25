@@ -50,7 +50,12 @@ export const LaunchVideo: React.FC<{ cut: 'landscape' | 'vertical' }> = ({ cut }
       })}
 
       {/* The mark parks in the corner once scene 2 has introduced it. */}
-      <Sequence from={offsets[2]} name="watermark" layout="none">
+      <Sequence
+        from={offsets[2]}
+        durationInFrames={offsets[6] - offsets[2]}
+        name="watermark"
+        layout="none"
+      >
         <Watermark />
       </Sequence>
     </AbsoluteFill>

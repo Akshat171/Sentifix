@@ -40,3 +40,15 @@ audio bed cannot be built without them.
 Captures are 1372×885 JPEG (viewport). The manifest targets 2× PNG. Good enough to
 block out scenes 1/5/6; re-capture before the final render. Scenes 3 and 4 don't
 need screenshots at all — they render natively from `diff.txt` and `eval.json`.
+
+## Update — scenes built
+All seven scenes now render from `src/generated/run-data.ts`. Notes:
+
+- `dashboard-real.jpg` is `dashboard.jpg` cropped to its top 372px, which removes
+  the synthetic `acme/my-api` row. Scene 5 uses the cropped file; the uncropped
+  original is kept for reference. Re-crop if you recapture.
+- Scene 1 renders the seven real inbox issues as native type rather than a
+  screenshot, so `issue-inbox.png` and `issue-detail.png` are no longer needed.
+- Scene 5 renders the three delivery surfaces natively, so `pr.png` and
+  `slack.png` are no longer needed either.
+- `music.mp3` is still absent and no `<Audio>` tag is mounted. The cut is silent.

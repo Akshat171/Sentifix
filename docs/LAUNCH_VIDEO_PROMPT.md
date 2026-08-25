@@ -57,10 +57,18 @@ Real strings only — never invent a fake customer name or a fake metric.
 
 ---
 
-## Step 2 — The prompt
+## Step 2 — The prompt — USED, scenes built 2026-08-25
 
-Paste everything in the block below into Claude Code from the repo root, after
-the assets are in `video/public/`.
+All seven scenes are built and both cuts render. The prompt below is kept as the
+spec: it records what each scene is meant to do, and it is the thing to re-run
+if a scene is rebuilt. Two deliberate departures from it:
+
+- Scenes 1 and 5 render their content as native type rather than embedding
+  `issue-inbox`/`issue-detail`/`pr`/`slack` screenshots. Sharper at any
+  resolution, and those four assets are no longer needed.
+- There is no counter ticking "12 -> 487" in scene 1. That number was invented
+  when the storyboard was written; the scene uses the seven real indexed issues
+  instead and no fabricated total.
 
 ```
 Build the Sentifix launch video in ./video using Remotion 4 + TypeScript.
