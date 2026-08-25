@@ -81,8 +81,18 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
 .totals dt{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .totals dd{margin:5px 0 0;font-family:var(--mono);font-size:1.4rem;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .repos{display:grid;gap:11px}
-.repo{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:16px 18px;text-decoration:none;color:inherit;transition:border-color .15s,transform .15s}
+.repo{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:16px 18px;text-decoration:none;color:inherit;transition:border-color .15s,transform .15s;cursor:pointer}
 .repo:hover{border-color:var(--accent);transform:translateY(-1px)}
+.repo.off{opacity:.62}
+.repo.off:hover{border-color:var(--line);transform:none}
+.repo .name a{color:inherit;text-decoration:none}
+.repo .name a:hover{text-decoration:underline}
+.conn{background:none;border:1px solid var(--line);color:var(--muted);font:inherit;font-size:.75rem;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.conn:hover{border-color:var(--del);color:var(--del);background:var(--del-wash)}
+.conn.armed{border-color:var(--del);background:var(--del);color:#fff;font-weight:600}
+.conn.on{color:var(--accent-text);border-color:var(--accent)}
+.conn.on:hover{background:var(--accent-wash);color:var(--accent-text)}
+.conn:disabled{opacity:.5;cursor:default}
 .repo .name{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.9375rem;font-weight:600;letter-spacing:-.01em}
 .repo .name svg{opacity:.5;flex:none}
 .repo .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:.8125rem;color:var(--muted)}
@@ -153,6 +163,7 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
 
   // The tag answers "do I need to do anything about this repo?" — not just status.
   function tag(r) {
+    if (r.connected === false) return '<span class="tag waiting">Disconnected</span>';
     if (!r.indexed) return '<span class="tag waiting">Not indexed</span>';
     if (r.runs > 0 && r.failed > r.completed) return '<span class="tag attention">Failing</span>';
     if (r.issues === 0) return '<span class="tag ready">Ready · no issues yet</span>';
@@ -187,8 +198,13 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
         '<div><dt>Avg fix score</dt><dd>' + avg + '</dd></div>' +
       '</dl>' +
       '<div class="repos">' + repos.map(function (r) {
-        return '<a class="repo" href="/dashboard/issues?repo=' + encodeURIComponent(r.repoFullName) + '">' +
-          '<div><div class="name">' + ${JSON.stringify(GITHUB_ICON)} + esc(r.repoFullName) + '</div>' +
+        var off = r.connected === false;
+        var href = '/dashboard/issues?repo=' + encodeURIComponent(r.repoFullName);
+        // A div rather than an anchor, because a button cannot legally live inside
+        // one. The row stays clickable via the delegated handler below.
+        return '<div class="repo' + (off ? ' off' : '') + '" data-href="' + href + '">' +
+          '<div><div class="name">' + ${JSON.stringify(GITHUB_ICON)} +
+            '<a href="' + href + '">' + esc(r.repoFullName) + '</a></div>' +
           '<div class="meta">' +
             '<span><b>' + r.issues + '</b> issues</span>' +
             '<span><b>' + r.completed + '</b> triaged</span>' +
@@ -199,21 +215,75 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
             '<div class="score" style="color:' + scoreColor(r.avgScore) + '">' +
               (r.avgScore === null ? '—' : r.avgScore.toFixed(2)) +
               '<small>score</small></div>' +
-          '</div></a>';
+            '<button class="conn' + (off ? ' on' : '') + '" data-repo="' + esc(r.repoFullName) + '"' +
+              ' data-connect="' + (off ? '1' : '0') + '">' + (off ? 'Reconnect' : 'Disconnect') + '</button>' +
+          '</div></div>';
       }).join('') + '</div>';
+
+    wireRows();
   }
 
-  fetch('/triage/overview')
-    .then(function (res) {
-      if (res.status === 401) { window.location.href = '/auth/login'; return null; }
-      if (!res.ok) throw new Error('Could not load your repositories');
-      return res.json();
-    })
-    .then(function (d) { if (d) render(d); })
-    .catch(function (e) {
-      sub.textContent = '';
-      root.innerHTML = '<p class="err">' + esc(e.message) + '</p>';
+  function wireRows() {
+    Array.prototype.forEach.call(root.querySelectorAll('.repo'), function (card) {
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('button') || e.target.closest('a')) return;
+        window.location.href = card.dataset.href;
+      });
     });
+
+    Array.prototype.forEach.call(root.querySelectorAll('.conn'), function (btn) {
+      btn.addEventListener('click', function () {
+        var connect = btn.dataset.connect === '1';
+
+        // Reconnecting is harmless, so it goes straight through. Disconnecting
+        // stops triage on a live repo, so it asks once first.
+        if (!connect && !btn.classList.contains('armed')) {
+          btn.classList.add('armed');
+          btn.textContent = 'Stop triaging?';
+          setTimeout(function () {
+            btn.classList.remove('armed');
+            btn.textContent = 'Disconnect';
+          }, 4000);
+          return;
+        }
+
+        var parts = btn.dataset.repo.split('/');
+        btn.disabled = true;
+        btn.textContent = connect ? 'Reconnecting…' : 'Disconnecting…';
+
+        fetch('/triage/repos/' + encodeURIComponent(parts[0]) + '/' + encodeURIComponent(parts[1]) + '/connection', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ connected: connect }),
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('Could not update ' + btn.dataset.repo);
+            return load();
+          })
+          .catch(function (e) {
+            btn.disabled = false;
+            btn.textContent = connect ? 'Reconnect' : 'Disconnect';
+            sub.textContent = e.message;
+          });
+      });
+    });
+  }
+
+  function load() {
+    return fetch('/triage/overview')
+      .then(function (res) {
+        if (res.status === 401) { window.location.href = '/auth/login'; return null; }
+        if (!res.ok) throw new Error('Could not load your repositories');
+        return res.json();
+      })
+      .then(function (d) { if (d) render(d); })
+      .catch(function (e) {
+        sub.textContent = '';
+        root.innerHTML = '<p class="err">' + esc(e.message) + '</p>';
+      });
+  }
+
+  load();
 })();
 </script>`,
       }),

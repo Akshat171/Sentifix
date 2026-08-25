@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { SessionGuard } from '../auth/session.guard';
 import type { SessionPayload } from '../auth/session.service';
@@ -37,6 +37,26 @@ export class TriageController {
   @Post('issues/:issueId/retriage')
   retriageIssue(@Param('issueId') issueId: string, @Req() req: { session?: SessionPayload }) {
     return this.triage.retriageIssue(issueId, this.scope(req));
+  }
+
+  /**
+   * Switch a repo off (or back on) without uninstalling the GitHub App.
+   *
+   * Scoped like every other write here: you can only act on repos mapped to your
+   * own installations, so the owner/repo in the path cannot reach another tenant.
+   */
+  @Patch('repos/:owner/:repo/connection')
+  setRepoConnection(
+    @Param('owner') owner: string,
+    @Param('repo') repo: string,
+    @Body() body: { connected?: boolean },
+    @Req() req: { session?: SessionPayload },
+  ) {
+    return this.triage.setRepoConnected(
+      `${owner}/${repo}`,
+      body?.connected === true,
+      this.scope(req),
+    );
   }
 
   @Post('runs/:runId/resolve')

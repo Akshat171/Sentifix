@@ -131,6 +131,17 @@ export class IngestionService {
     repository: GithubIssuePayload['repository'],
     issue: GithubIssuePayload['issue'],
   ): Promise<void> {
+    // Checked before anything visible happens: no placeholder comment, no issue
+    // row, no job. This is the only gate that actually stops work on a repo the
+    // customer has disconnected — the webhook keeps arriving either way, because
+    // disconnecting here does not uninstall the GitHub App.
+    if (await this.isDisconnected(repository.full_name)) {
+      this.logger.log(
+        `Skipping issue #${issue.number} in ${repository.full_name} — repository is disconnected`,
+      );
+      return;
+    }
+
     const existing = await this.issueRepo.findOne({
       where: { githubRepoId: String(repository.id), githubIssueNumber: issue.number },
     });
@@ -171,6 +182,13 @@ export class IngestionService {
 
     if (ref !== defaultBranch) {
       this.logger.debug(`Skipping push to non-default branch: ${ref}`);
+      return;
+    }
+
+    // A disconnected repo should stop being cloned and re-indexed too, not just
+    // stop being triaged — otherwise "disconnected" still means "we pull your code".
+    if (await this.isDisconnected(repository.full_name)) {
+      this.logger.debug(`Skipping re-index of ${repository.full_name} — disconnected`);
       return;
     }
 
@@ -241,11 +259,23 @@ export class IngestionService {
     }
   }
 
-  /** Upsert exact repo→installation rows (unique on repoFullName). */
+  /** Whether the customer has switched this repo off from the dashboard. */
+  private async isDisconnected(repoFullName: string): Promise<boolean> {
+    const row = await this.installRepoMap.findOne({ where: { repoFullName } });
+    return row?.disconnectedAt != null;
+  }
+
+  /**
+   * Upsert exact repo→installation rows (unique on repoFullName).
+   *
+   * Clears `disconnectedAt`: this runs when the App is installed on a repo or the
+   * repo is added to an existing installation, and doing either on GitHub is an
+   * unambiguous "turn this back on" — leaving it disconnected would look broken.
+   */
   private async mapRepos(installationId: number, repos: string[]): Promise<void> {
     if (!repos.length) return;
     await this.installRepoMap.upsert(
-      repos.map((repoFullName) => ({ installationId, repoFullName })),
+      repos.map((repoFullName) => ({ installationId, repoFullName, disconnectedAt: null })),
       ['repoFullName'],
     );
   }

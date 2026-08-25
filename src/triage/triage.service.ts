@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, Not, Repository } from 'typeorm';
 import { TriageRunner } from '../agent/triage-runner.service';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
@@ -35,6 +35,8 @@ export interface RepoOverview {
   lastActivity: string | null;
   indexed: boolean;
   chunks: number;
+  /** False when the customer has switched this repo off. */
+  connected: boolean;
 }
 
 @Injectable()
@@ -373,6 +375,14 @@ export class TriageService {
       [repos],
     );
 
+    const disconnected = new Set(
+      (
+        await this.installRepoMap.find({
+          where: { repoFullName: In(repos), disconnectedAt: Not(IsNull()) },
+        })
+      ).map((r) => r.repoFullName),
+    );
+
     return rows.map((row) => ({
       repoFullName: row.repofullname,
       issues: Number(row.issues),
@@ -383,7 +393,37 @@ export class TriageService {
       lastActivity: row.lastactivity,
       indexed: Number(row.chunks) > 0,
       chunks: Number(row.chunks),
+      connected: !disconnected.has(row.repofullname),
     }));
+  }
+
+  /**
+   * Stop acting on a repo without uninstalling the GitHub App.
+   *
+   * The mapping row is kept rather than deleted, for two reasons: the repo stays
+   * attributed to this installation, so its history and spend do not fragment onto
+   * a wallet of their own; and reconnecting is one click instead of a reinstall.
+   *
+   * Already-indexed code is left in place so reconnecting is instant. Nothing new
+   * is pulled while disconnected — see IngestionService.handlePushEvent.
+   */
+  async setRepoConnected(
+    repoFullName: string,
+    connected: boolean,
+    scope?: TenantScope,
+  ): Promise<{ repoFullName: string; connected: boolean }> {
+    await this.assertRepoInScope(repoFullName, scope);
+
+    const row = await this.installRepoMap.findOne({ where: { repoFullName } });
+    if (!row) {
+      throw new NotFoundException(`${repoFullName} is not connected to an installation`);
+    }
+
+    row.disconnectedAt = connected ? null : new Date();
+    await this.installRepoMap.save(row);
+
+    this.logger.log(`${repoFullName} ${connected ? 'reconnected' : 'disconnected'}`);
+    return { repoFullName, connected };
   }
 
   /**

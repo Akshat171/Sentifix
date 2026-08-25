@@ -18,6 +18,16 @@ export class InstallationRepository {
   @Column()
   repoFullName: string;
 
+  /**
+   * Set when the customer disconnects the repo from the dashboard. The row stays
+   * so the repo keeps belonging to this installation — deleting it instead would
+   * silently move the repo's spend onto its own wallet (see AccountService.forRepo)
+   * and, because ingestion does not consult this table to decide whether to run,
+   * would not have stopped anything.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  disconnectedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }
