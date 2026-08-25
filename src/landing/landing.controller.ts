@@ -69,6 +69,22 @@ export class LandingController {
 .tick{color:var(--add);font-weight:700}
 
 .band{padding-block:clamp(60px,8vw,96px);border-top:1px solid var(--line)}
+/* Video player. Click-to-play with a poster: the launch film is 72s and nobody
+   should pay for it on page load, so the <video> carries preload="none" and no
+   bytes move until the poster is clicked. */
+.player{position:relative;margin-inline:auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--sunk);box-shadow:var(--shadow);aspect-ratio:16/9;max-width:1040px}
+.player video{display:block;width:100%;height:100%;object-fit:contain;background:var(--sunk)}
+/* Narrow screens get the 9:16 cut, so the frame follows it. Capped by viewport
+   height or a tall video pushes the whole page around on a phone. */
+.player[data-orientation="vertical"]{aspect-ratio:9/16;max-width:min(420px,88vw);max-height:78vh}
+.player-btn{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;border:0;background:transparent;cursor:pointer;color:var(--ink);font:inherit;padding:0}
+.player-btn:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.player-btn .disc{display:flex;align-items:center;justify-content:center;width:76px;height:76px;border-radius:50%;background:var(--accent);box-shadow:0 10px 30px -8px rgb(0 0 0 / .55);transition:transform .16s ease}
+.player-btn:hover .disc{transform:scale(1.06)}
+.player-btn .disc svg{width:28px;height:28px;margin-left:4px;fill:#fff}
+.player-btn .cap{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.player.is-playing .player-btn{display:none}
+@media (prefers-reduced-motion:reduce){.player-btn .disc{transition:none}}
 .band-head{display:flex;flex-direction:column;gap:14px;margin-bottom:clamp(36px,4vw,52px)}
 .cards{display:grid;gap:22px}
 @media (min-width:760px){.cards{grid-template-columns:repeat(3,1fr)}}
@@ -214,6 +230,56 @@ footer{border-top:1px solid var(--line);padding-block:34px}
         <span><strong>Runs in ~30s</strong> per issue</span>
       </div>
     </div>
+  </section>
+
+  <section class="band" id="watch">
+    <div class="wrap">
+      <div class="band-head">
+        <span class="label">The pipeline, end to end</span>
+        <h2>Watch it work.</h2>
+        <p class="lede">Seventy-two seconds: an issue classified, the repository searched, a root cause found, a patch written, and the patch scored. The diff and the score on screen are the real output of a real run.</p>
+      </div>
+      <div class="player" data-player
+           data-src-wide="/static/media/launch-16x9.mp4"
+           data-src-tall="/static/media/launch-9x16.mp4"
+           data-poster-wide="/static/media/launch-poster-16x9.jpg"
+           data-poster-tall="/static/media/launch-poster-9x16.jpg">
+        <video
+          preload="none"
+          playsinline
+          controls
+          poster="/static/media/launch-poster-16x9.jpg"
+          src="/static/media/launch-16x9.mp4"
+          aria-label="Sentifix triaging a GitHub issue: classification, retrieval over the repository, root-cause diagnosis, a proposed patch, and the patch's evaluation score."
+        ></video>
+        <button class="player-btn" type="button" aria-label="Play the Sentifix launch video">
+          <span class="disc" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+          <span class="cap">72 seconds &middot; no sound</span>
+        </button>
+      </div>
+    </div>
+    <script>
+(function () {
+  var box = document.querySelector('[data-player]');
+  if (!box) return;
+  var video = box.querySelector('video');
+  var btn = box.querySelector('.player-btn');
+  // Portrait-ish viewports get the 9:16 cut. Chosen once, before any bytes are
+  // fetched, and never swapped mid-playback -- a resize should not restart it.
+  var tall = window.matchMedia('(max-width: 700px)').matches;
+  if (tall) {
+    box.setAttribute('data-orientation', 'vertical');
+    video.poster = box.dataset.posterTall;
+    video.src = box.dataset.srcTall;
+  }
+  btn.addEventListener('click', function () {
+    box.classList.add('is-playing');
+    var p = video.play();
+    // Autoplay policies can still reject; surface the controls either way.
+    if (p && p.catch) p.catch(function () { video.controls = true; });
+  });
+})();
+</script>
   </section>
 
   <section class="band" id="example">

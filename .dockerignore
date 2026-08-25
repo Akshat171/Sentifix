@@ -1,0 +1,18 @@
+# The video workspace is a build-time-only concern and carries ~640MB of
+# Remotion dependencies plus rendered output. Web-ready media is committed
+# separately under public/media/.
+video
+
+node_modules
+dist
+coverage
+.git
+.github
+test
+eval
+*.log
+
+# Never let secrets into the build context.
+.env
+.env.*
+!.env.example

@@ -23,6 +23,8 @@ WORKDIR /app
 COPY --from=deps --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:appgroup /app/dist ./dist
 COPY --chown=appuser:appgroup package.json ./
+# Static media is read from ./public at runtime (see useStaticAssets in main.ts).
+COPY --chown=appuser:appgroup public ./public
 USER appuser
 EXPOSE 3000
 ENV NODE_ENV=production
