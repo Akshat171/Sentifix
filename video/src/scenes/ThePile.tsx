@@ -68,6 +68,8 @@ export const ThePile: React.FC = () => {
             // The pile is meant to outgrow its box; clipping at the top edge
             // reads as overflow, whereas overlapping the headline reads as a bug.
             overflow: 'hidden',
+            maskImage: 'linear-gradient(to bottom, transparent 0, #000 92px)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 92px)',
           }}
         >
           {rows.map((row, i) => {

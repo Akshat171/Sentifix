@@ -27,6 +27,8 @@ export const CTA: React.FC = () => {
   );
   const done = typed[1] === LINES[1].length;
   const links = spring({ fps, frame: frame - (starts[1] + 40), config: ENTER_SPRING });
+  // The terminal fades in with the mark; an empty box on frame 0 looks unfinished.
+  const boxIn = spring({ fps, frame: frame - 10, config: ENTER_SPRING });
 
   return (
     <Stage center>
@@ -43,6 +45,8 @@ export const CTA: React.FC = () => {
           padding: `${t.gap * 1.1}px ${t.gap * 1.3}px`,
           textAlign: 'left',
           minWidth: cut === 'vertical' ? '100%' : 820,
+          opacity: boxIn,
+          transform: `translateY(${(1 - boxIn) * 16}px)`,
         }}
       >
         {LINES.map((line, i) => (

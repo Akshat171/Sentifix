@@ -14,7 +14,7 @@ export interface TypeScale {
  */
 const SCALES: Record<Cut, TypeScale> = {
   landscape: { h1: 84, h2: 50, body: 32, mono: 25, small: 19, pad: 120, gap: 22 },
-  vertical: { h1: 66, h2: 42, body: 33, mono: 24, small: 18, pad: 72, gap: 20 },
+  vertical: { h1: 78, h2: 50, body: 40, mono: 30, small: 22, pad: 64, gap: 24 },
 };
 
 /** Which cut are we rendering? Derived from the frame, never passed down. */

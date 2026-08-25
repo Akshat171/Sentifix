@@ -10,14 +10,34 @@ import { MONO } from '../fonts';
 import { useCut, type TypeScale } from '../type';
 import { RUN, DIFF_LINES, DIFF_STATS } from '../generated/run-data';
 
-/** Beat boundaries in scene-local frames. Sum must equal the scene's length. */
-const BEATS = [
-  { node: 0, from: 0, to: 150 },
-  { node: 1, from: 150, to: 330 },
-  { node: 2, from: 330, to: 500 },
-  { node: 3, from: 500, to: 560 },
-  { node: 4, from: 560, to: 780 },
+/**
+ * Beat lengths as weights, not frames. The vertical cut gives this scene 540
+ * frames against the landscape cut's 780, so fixed boundaries would run past the
+ * end of the scene and the proposeFix beat — the diff, the whole point — would
+ * never play. Weights scale to whatever duration the composition allots.
+ */
+const BEAT_WEIGHTS = [
+  { node: 0, weight: 150 },
+  { node: 1, weight: 180 },
+  { node: 2, weight: 170 },
+  { node: 3, weight: 60 },
+  { node: 4, weight: 220 },
 ];
+
+const buildBeats = (durationInFrames: number) => {
+  const total = BEAT_WEIGHTS.reduce((sum, b) => sum + b.weight, 0);
+  let at = 0;
+  return BEAT_WEIGHTS.map((b, i) => {
+    const from = at;
+    // The last beat absorbs the rounding remainder so the beats tile exactly.
+    const to =
+      i === BEAT_WEIGHTS.length - 1
+        ? durationInFrames
+        : Math.round(from + (b.weight / total) * durationInFrames);
+    at = to;
+    return { node: b.node, from, to };
+  });
+};
 
 const HANDOFF = 16; // frames spent gliding from one node to the next
 
@@ -207,11 +227,13 @@ const Targeted: React.FC<{ t: TypeScale; local: number }> = ({ t, local }) => (
 );
 
 /** Beat 5 — the real proposed diff, drawn line by line. */
-const ProposeFix: React.FC<{ t: TypeScale; local: number }> = ({ t, local }) => {
+const ProposeFix: React.FC<{ t: TypeScale; local: number; span: number }> = ({ t, local, span }) => {
   const { cut } = useCut();
   const size = cut === 'vertical' ? t.small : t.mono * 0.86;
   const visible = cut === 'vertical' ? 15 : 19;
-  const revealed = Math.max(0, (local - 8) / 2.6);
+  const HOLD = 34; // frames of stillness once the last line lands
+  const framesPerLine = Math.max(1.4, (span - HOLD - 8) / DIFF_LINES.length);
+  const revealed = Math.max(0, (local - 8) / framesPerLine);
   const scroll = Math.max(0, Math.min(DIFF_LINES.length - visible, revealed - visible + 2));
 
   return (
@@ -241,8 +263,10 @@ const ProposeFix: React.FC<{ t: TypeScale; local: number }> = ({ t, local }) => 
 
 export const Pipeline: React.FC = () => {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
   const { t } = useCut();
 
+  const BEATS = buildBeats(durationInFrames);
   const beat = BEATS.find((b) => frame >= b.from && frame < b.to) ?? BEATS[BEATS.length - 1];
   const local = frame - beat.from;
   const progress = interpolate(local, [0, beat.to - beat.from], [0, 1], {
@@ -279,7 +303,7 @@ export const Pipeline: React.FC = () => {
             layout="none"
             name={`beat:${beat.node}`}
           >
-            <Body t={t} local={local} />
+            <Body t={t} local={local} span={beat.to - beat.from} />
           </Sequence>
         </div>
       </div>
