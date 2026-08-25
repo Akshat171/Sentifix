@@ -69,6 +69,63 @@ export class LandingController {
 .tick{color:var(--add);font-weight:700}
 
 .band{padding-block:clamp(60px,8vw,96px);border-top:1px solid var(--line)}
+/* The pipeline, animated in the page rather than shipped as a second video:
+   it starts instantly, costs ~4KB, stays sharp at any DPI, keeps its text
+   selectable, and re-themes with the tokens. One 15s cycle, five 3s stages.
+   Every element carries the same 15s duration and is phase-shifted by delay,
+   so nothing can drift out of sync however long the page stays open. */
+.flow{margin-bottom:clamp(38px,4vw,54px);border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:clamp(18px,2.4vw,26px);box-shadow:var(--shadow)}
+.flow-rail{display:flex;align-items:center;gap:7px;list-style:none;margin:0 0 20px;padding:0 0 4px;overflow-x:auto;scrollbar-width:none}
+.flow-rail::-webkit-scrollbar{display:none}
+.flow-rail li{flex:none;font-family:var(--mono);font-size:.75rem;font-weight:600;padding:6px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--ground);white-space:nowrap;animation:flowNode 15s infinite}
+.flow-rail .arw{flex:none;width:14px;height:1px;background:var(--line);border:0;padding:0;animation:none}
+.flow-stage-box{position:relative;min-height:184px}
+.flow-stage{position:absolute;inset:0;opacity:0;visibility:hidden;animation:flowStage 15s infinite}
+.flow-cap{font-family:var(--mono);font-size:.6875rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-text);margin:0 0 12px}
+.flow-chips{display:flex;gap:8px;flex-wrap:wrap}
+.flow-chip{font-family:var(--mono);font-size:.8125rem;font-weight:600;padding:7px 13px;border-radius:8px;background:var(--sunk);border:1px solid var(--line)}
+.flow-chip.sev{color:var(--sev-high);border-color:var(--sev-high)}
+.flow-files{display:flex;flex-direction:column;gap:7px;font-family:var(--mono);font-size:.8125rem}
+.flow-files li{list-style:none;padding:6px 11px;border-left:2px solid var(--accent);background:var(--accent-wash);border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-type{font-family:var(--mono);font-size:.8125rem;line-height:1.7;white-space:nowrap;overflow:hidden;width:0;border-right:2px solid var(--accent);animation:flowType 15s infinite}
+.flow-note{font-size:.875rem;color:var(--muted);margin:10px 0 0;max-width:60ch}
+.flow-diff{font-family:var(--mono);font-size:.8125rem;line-height:1.75}
+.flow-diff div{padding:1px 9px;border-radius:3px;white-space:pre;overflow:hidden;text-overflow:ellipsis;opacity:0;animation:flowLine 15s infinite}
+.flow-diff .del{color:var(--del);background:var(--del-wash)}
+.flow-diff .add{color:var(--add);background:var(--add-wash)}
+.flow-score{display:flex;align-items:center;gap:16px}
+.flow-score b{font-family:var(--mono);font-size:2.4rem;font-weight:600;letter-spacing:-.03em;color:var(--add);font-variant-numeric:tabular-nums}
+.flow-bar{flex:1;height:7px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.flow-bar i{display:block;height:100%;width:0;border-radius:99px;background:var(--add);animation:flowBar 15s infinite}
+.flow-alt{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+@keyframes flowNode{
+  0%{color:var(--muted);border-color:var(--line);background:var(--ground)}
+  0.6%,19.4%{color:var(--accent-text);border-color:var(--accent);background:var(--accent-wash)}
+  20%,99%{color:var(--add);border-color:var(--add);background:var(--ground)}
+  100%{color:var(--muted);border-color:var(--line);background:var(--ground)}
+}
+@keyframes flowStage{
+  0%{opacity:0;visibility:visible;transform:translateY(7px)}
+  1.6%,18%{opacity:1;visibility:visible;transform:none}
+  19.9%{opacity:0;visibility:visible;transform:translateY(-5px)}
+  20%,100%{opacity:0;visibility:hidden;transform:translateY(-5px)}
+}
+@keyframes flowType{0%,1%{width:0}12%,18%{width:100%}20%,100%{width:0}}
+@keyframes flowLine{0%,1%{opacity:0;transform:translateX(-7px)}4%,18%{opacity:1;transform:none}20%,100%{opacity:0}}
+@keyframes flowBar{0%,2%{width:0}14%,18%{width:97.5%}20%,100%{width:0}}
+
+/* Reduced motion: stop the cycle and lay the five stages out as a static
+   list, so the content is still all there rather than a stack of overlaps. */
+@media (prefers-reduced-motion:reduce){
+  .flow-rail li,.flow-stage,.flow-type,.flow-diff div,.flow-bar i{animation:none}
+  .flow-rail li{color:var(--muted);border-color:var(--line)}
+  .flow-stage-box{min-height:0;display:flex;flex-direction:column;gap:26px}
+  .flow-stage{position:static;opacity:1;visibility:visible;transform:none}
+  .flow-type{width:auto;white-space:normal;border-right:0}
+  .flow-diff div{opacity:1}
+  .flow-bar i{width:97.5%}
+}
 /* Video player. Click-to-play with a poster: the launch film is 72s and nobody
    should pay for it on page load, so the <video> carries preload="none" and no
    bytes move until the poster is clicked. */
@@ -347,6 +404,69 @@ footer{border-top:1px solid var(--line);padding-block:34px}
         <h2>Three steps, and none of them are yours.</h2>
         <p class="lede">Install once. Everything after that happens on its own, in the open, in the issue thread.</p>
       </div>
+
+      <div class="flow" role="img" aria-label="The triage pipeline, animated in five stages. One: an issue is classified as high severity, a crash, in AuthService. Two: hybrid search retrieves the relevant files from the indexed repository. Three: the root cause is identified — the userId property is being accessed from an undefined object within the validateOAuthToken method. Four: a patch is proposed as a unified diff. Five: the patch is scored 0.975 by an LLM judge before anyone sees it.">
+        <ol class="flow-rail" aria-hidden="true">
+          <li style="animation-delay:0s">classify</li>
+          <li class="arw"></li>
+          <li style="animation-delay:3s">retrieve</li>
+          <li class="arw"></li>
+          <li style="animation-delay:6s">diagnose</li>
+          <li class="arw"></li>
+          <li style="animation-delay:9s">propose fix</li>
+          <li class="arw"></li>
+          <li style="animation-delay:12s">score</li>
+        </ol>
+
+        <div class="flow-stage-box" aria-hidden="true">
+          <figure class="flow-stage" style="animation-delay:0s">
+            <p class="flow-cap">Classified</p>
+            <div class="flow-chips">
+              <span class="flow-chip sev">severity: high</span>
+              <span class="flow-chip">crash</span>
+              <span class="flow-chip">AuthService</span>
+            </div>
+            <p class="flow-note">Every issue arrives labelled, so the queue sorts itself before anyone opens a tab.</p>
+          </figure>
+
+          <figure class="flow-stage" style="animation-delay:3s">
+            <p class="flow-cap">Retrieved from your repository</p>
+            <ul class="flow-files">
+              <li>src/auth/auth.service.ts</li>
+              <li>src/auth/auth.controller.ts</li>
+              <li>src/auth/token.service.ts</li>
+            </ul>
+            <p class="flow-note">Keyword and vector search run together, then the two rankings are fused.</p>
+          </figure>
+
+          <figure class="flow-stage" style="animation-delay:6s">
+            <p class="flow-cap">Root cause</p>
+            <p class="flow-type" style="animation-delay:6s">The &apos;userId&apos; property is being accessed from an undefined object&hellip;</p>
+            <p class="flow-note">Traced back to the line that caused it, with the surrounding code as context.</p>
+          </figure>
+
+          <figure class="flow-stage" style="animation-delay:9s">
+            <p class="flow-cap">Proposed fix</p>
+            <div class="flow-diff">
+              <div class="del" style="animation-delay:9s">- const userId = tokenDetails.userId;</div>
+              <div class="add" style="animation-delay:9.15s">+ if (!tokenDetails.userId) {</div>
+              <div class="add" style="animation-delay:9.3s">+   throw new Error(&apos;User ID not found in token details&apos;);</div>
+              <div class="add" style="animation-delay:9.45s">+ }</div>
+            </div>
+            <p class="flow-note">A unified diff you can read, apply, or reject &mdash; opened as a pull request.</p>
+          </figure>
+
+          <figure class="flow-stage" style="animation-delay:12s">
+            <p class="flow-cap">Scored before you see it</p>
+            <div class="flow-score">
+              <b>0.975</b>
+              <span class="flow-bar"><i style="animation-delay:12s"></i></span>
+            </div>
+            <p class="flow-note">A second model grades the patch on correctness, completeness, safety and clarity. Low scores never reach the thread.</p>
+          </figure>
+        </div>
+      </div>
+
       <div class="steps">
         <article class="step">
           <span class="step-n">STEP 01</span>
