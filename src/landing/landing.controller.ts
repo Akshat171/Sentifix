@@ -130,7 +130,7 @@ export class LandingController {
    should pay for it on page load, so the <video> carries preload="none" and no
    bytes move until the poster is clicked. */
 .player{position:relative;margin-inline:auto;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--sunk);box-shadow:var(--shadow);aspect-ratio:16/9;max-width:1040px}
-.player video{display:block;width:100%;height:100%;object-fit:contain;background:var(--sunk)}
+.player video{display:block;width:100%;height:100%;object-fit:contain;background:var(--sunk);cursor:pointer}
 /* Narrow screens get the 9:16 cut, so the frame follows it. Capped by viewport
    height or a tall video pushes the whole page around on a phone. */
 .player[data-orientation="vertical"]{aspect-ratio:9/16;max-width:min(420px,88vw);max-height:78vh}
@@ -304,7 +304,7 @@ footer{border-top:1px solid var(--line);padding-block:34px}
         <video
           preload="none"
           playsinline
-          controls
+          disablepictureinpicture
           poster="/static/media/launch-poster-16x9.jpg"
           src="/static/media/launch-16x9.mp4"
           aria-label="Sentifix triaging a GitHub issue: classification, retrieval over the repository, root-cause diagnosis, a proposed patch, and the patch's evaluation score."
@@ -329,11 +329,25 @@ footer{border-top:1px solid var(--line);padding-block:34px}
     video.poster = box.dataset.posterTall;
     video.src = box.dataset.srcTall;
   }
-  btn.addEventListener('click', function () {
+  function start() {
     box.classList.add('is-playing');
     var p = video.play();
-    // Autoplay policies can still reject; surface the controls either way.
-    if (p && p.catch) p.catch(function () { video.controls = true; });
+    // If the browser refuses to play, put the poster and button back rather
+    // than leaving a dead black frame.
+    if (p && p.catch) p.catch(function () { box.classList.remove('is-playing'); });
+  }
+
+  btn.addEventListener('click', start);
+
+  // No control bar, so the frame itself is the pause target.
+  video.addEventListener('click', function () {
+    if (video.paused) { start(); } else { video.pause(); }
+  });
+
+  // Back to the poster when it finishes, ready to be played again.
+  video.addEventListener('ended', function () {
+    box.classList.remove('is-playing');
+    video.currentTime = 0;
   });
 })();
 </script>
