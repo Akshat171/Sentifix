@@ -21,7 +21,7 @@ export class TriageController {
 
   @Get('issues')
   getAllIssues(@Req() req: { session?: SessionPayload }) {
-    return this.triage.getAllIssues(this.scope(req));
+    return this.triage.getIssueSummaries(this.scope(req));
   }
 
   @Get('issues/:issueId/runs')

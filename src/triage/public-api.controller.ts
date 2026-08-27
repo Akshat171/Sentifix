@@ -43,7 +43,7 @@ export class PublicApiController {
 
   @Get('issues')
   async issues(@Req() req: KeyedRequest) {
-    return this.triage.getAllIssues(await this.scope(req));
+    return this.triage.getIssueSummaries(await this.scope(req));
   }
 
   @Get('runs/:runId')

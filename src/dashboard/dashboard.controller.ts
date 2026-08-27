@@ -125,6 +125,17 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 <script>
 const API = '';
 let issues = [];
+let selectedId = null;
+let lastPayload = '';
+let timer = null;
+let failures = 0;
+
+// Cadence follows what is actually happening. A run in flight finishes in
+// seconds, so waiting 30s to show it is too slow; a settled board changes only
+// when a new issue arrives, so polling it twice a minute is pure waste.
+const FAST_MS = 5000;
+const IDLE_MS = 60000;
+const MAX_BACKOFF_MS = 300000;
 
 function sev(s) {
   const colors = {
@@ -134,8 +145,8 @@ function sev(s) {
   return colors[s?.toLowerCase()] || 'var(--muted)';
 }
 
-function latestRun(issue) {
-  return (issue.runs || []).sort((a,b) => new Date(b.startedAt) - new Date(a.startedAt))[0];
+function inFlight() {
+  return issues.some(i => i.latestRun && (i.latestRun.status === 'pending' || i.latestRun.status === 'running'));
 }
 
 function scoreColor(s) {
@@ -145,31 +156,64 @@ function scoreColor(s) {
   return 'var(--sev-critical)';
 }
 
-async function loadIssues() {
+async function loadIssues(opts) {
+  const showLoader = !(opts && opts.quiet) && !issues.length;
   const list = document.getElementById('issue-list');
-  list.innerHTML = '<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  if (showLoader) {
+    list.innerHTML = '<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  }
   try {
     const r = await fetch(API + '/triage/issues');
-    issues = await r.json();
-    renderList();
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    failures = 0;
+
+    // Nothing changed since the last poll — leave the DOM alone. Re-rendering
+    // identical rows would drop the selection highlight and any text selection
+    // the user is in the middle of making.
+    if (text !== lastPayload) {
+      lastPayload = text;
+      issues = JSON.parse(text);
+      renderList();
+    }
   } catch(e) {
-    list.innerHTML = '<div class="no-issues">Failed to load issues</div>';
+    failures++;
+    if (!issues.length) list.innerHTML = '<div class="no-issues">Failed to load issues</div>';
+  } finally {
+    schedule();
   }
 }
+
+/** Back off on repeated failure; otherwise follow whether work is in flight. */
+function nextDelay() {
+  if (failures > 0) return Math.min(FAST_MS * Math.pow(2, failures), MAX_BACKOFF_MS);
+  return inFlight() ? FAST_MS : IDLE_MS;
+}
+
+function schedule() {
+  clearTimeout(timer);
+  // A backgrounded tab polls nobody. The visibilitychange handler refreshes on
+  // return, so coming back to the tab shows current data immediately anyway.
+  if (document.hidden) return;
+  timer = setTimeout(() => loadIssues({ quiet: true }), nextDelay());
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearTimeout(timer);
+  else loadIssues({ quiet: true });
+});
 
 function renderList() {
   const list = document.getElementById('issue-list');
   if (!issues.length) { list.innerHTML = '<div class="no-issues">No issues triaged yet.<br>Open a GitHub issue to get started.</div>'; return; }
   list.innerHTML = issues.map((issue, i) => {
-    const run = latestRun(issue);
-    const cls = run?.classificationResult;
-    const evalRes = run?.evalResults?.[0];
-    const score = evalRes ? Math.round(evalRes.score * 100) : null;
-    const severity = cls?.severity || 'unknown';
-    return \`<div class="issue-card" onclick="selectIssue(\${i})" id="card-\${i}">
+    const run = issue.latestRun;
+    const score = run && run.score !== null ? Math.round(run.score * 100) : null;
+    const severity = run?.severity || 'unknown';
+    return \`<div class="issue-card\${issue.id === selectedId ? ' active' : ''}" onclick="selectIssue(\${i})" id="card-\${i}">
       <div class="issue-meta">
         <span class="badge" style="color:\${sev(severity)}">\${severity}</span>
-        \${score !== null ? \`<span class="score-pill" style="color:\${scoreColor(evalRes.score)}">\${score}/100</span>\` : '<span class="score-pill">pending</span>'}
+        \${score !== null ? \`<span class="score-pill" style="color:\${scoreColor(run.score)}">\${score}/100</span>\` : '<span class="score-pill">pending</span>'}
         <span class="source-badge source-\${issue.source || 'github'}">\${issue.source || 'github'}</span>
       </div>
       <div class="issue-title">\${issue.title}</div>
@@ -181,10 +225,32 @@ function renderList() {
   }).join('');
 }
 
-function selectIssue(i) {
+async function selectIssue(i) {
+  const issue = issues[i];
+  selectedId = issue.id;
   document.querySelectorAll('.issue-card').forEach(c => c.classList.remove('active'));
   document.getElementById('card-' + i)?.classList.add('active');
-  renderDetail(issues[i]);
+
+  const panel = document.getElementById('main-panel');
+  const run = issue.latestRun;
+  if (!run || run.status !== 'completed') {
+    panel.innerHTML = \`<div class="empty"><p>Run status: <strong>\${run?.status || 'no runs'}</strong></p><p style="font-size:.75rem;margin-top:8px">Check app logs for progress</p></div>\`;
+    return;
+  }
+
+  // The diff, diagnosis and rationale are fetched only for the run being opened.
+  // Shipping them with the list meant sending every run of every issue on every
+  // poll, which on real data was megabytes to render a handful of rows.
+  panel.innerHTML = '<div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  try {
+    const r = await fetch(API + '/triage/runs/' + run.id);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const full = await r.json();
+    if (selectedId !== issue.id) return; // user moved on while this was in flight
+    renderDetail(full, issue);
+  } catch (e) {
+    panel.innerHTML = '<div class="empty"><p>Could not load this run.</p></div>';
+  }
 }
 
 function parseDiff(diff) {
@@ -204,13 +270,8 @@ function parseRationale(raw) {
   try { return JSON.parse(raw); } catch { return { rationale: raw, breakdown: null }; }
 }
 
-function renderDetail(issue) {
-  const run = latestRun(issue);
+function renderDetail(run, issue) {
   const panel = document.getElementById('main-panel');
-  if (!run || run.status !== 'completed') {
-    panel.innerHTML = \`<div class="empty"><p>Run status: <strong>\${run?.status || 'no runs'}</strong></p><p style="font-size:.75rem;margin-top:8px">Check app logs for progress</p></div>\`;
-    return;
-  }
   const cls = run.classificationResult || {};
   const diag = run.diagnosisResult || {};
   const evalRes = run.evalResults?.[0];
@@ -296,7 +357,8 @@ async function retriageIssue(issueId, btn) {
     if (r.ok) {
       btn.textContent = 'Queued';
       btn.style.color = 'var(--add)';
-      setTimeout(() => loadIssues(), 2000);
+      // The new run is pending, so the next poll lands on FAST_MS by itself.
+      setTimeout(() => loadIssues({ quiet: true }), 2000);
     } else {
       btn.textContent = 'Failed';
       btn.style.color = 'var(--del)';
@@ -308,8 +370,9 @@ async function retriageIssue(issueId, btn) {
   }
 }
 
+// loadIssues() schedules the next poll itself, so there is no fixed interval to
+// drift out of step with how long a request actually takes.
 loadIssues();
-setInterval(loadIssues, 30000);
 </script>`,
     });
 

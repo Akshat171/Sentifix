@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { TriageRunner } from '../agent/triage-runner.service';
 import { GithubService } from '../github/github.service';
 import { IndexingJob } from '../indexing/indexing.job';
@@ -23,6 +23,25 @@ import { LowBalanceService } from '../billing/low-balance.service';
  * operator). An array of installation IDs restricts data to those installations' repos.
  */
 export type TenantScope = number[] | undefined;
+
+/** What the issue list needs — deliberately not the whole run. */
+export interface IssueSummary {
+  id: string;
+  title: string;
+  repoFullName: string | null;
+  githubIssueNumber: number | null;
+  source: string;
+  createdAt: string;
+  /** How many times this issue has been triaged. */
+  runs: number;
+  latestRun: {
+    id: string;
+    status: string | null;
+    startedAt: string | null;
+    severity: string | null;
+    score: number | null;
+  } | null;
+}
 
 export interface RepoOverview {
   repoFullName: string;
@@ -279,18 +298,88 @@ export class TriageService {
     return { runId: run.id };
   }
 
-  async getAllIssues(scope?: TenantScope): Promise<Issue[]> {
-    let where: FindOptionsWhere<Issue> | undefined;
+  /**
+   * One row per issue for the list view, carrying only its most recent run.
+   *
+   * This used to be `find({ relations: ['runs', 'runs.evalResults'] })`, which
+   * loaded every run an issue had ever had. The dashboard polls this endpoint and
+   * then calls latestRun() — so on production data (four issues, ~2,000 runs each
+   * after the requeue loop) every poll moved 5.5 MB out of Postgres to render
+   * four cards, and discarded all but four rows of it.
+   *
+   * DISTINCT ON gives Postgres the "latest run per issue" directly, so the work
+   * is bounded by the number of issues rather than the number of runs. The full
+   * run — diff, diagnosis, rationale — is fetched by getRunById when a row is
+   * actually opened.
+   */
+  async getIssueSummaries(scope?: TenantScope): Promise<IssueSummary[]> {
+    let repos: string[] | null = null;
     if (scope !== undefined) {
-      const repos = await this.reposForScope(scope);
+      repos = await this.reposForScope(scope);
       if (!repos.length) return []; // no accessible repos → nothing to show
-      where = { repoFullName: In(repos) };
     }
-    return this.issueRepo.find({
-      ...(where ? { where } : {}),
-      order: { createdAt: 'DESC' },
-      relations: ['runs', 'runs.evalResults'],
-    });
+
+    const rows: Array<{
+      id: string;
+      title: string;
+      repofullname: string | null;
+      githubissuenumber: number | null;
+      source: string | null;
+      createdat: string;
+      runid: string | null;
+      status: string | null;
+      startedat: string | null;
+      severity: string | null;
+      score: string | null;
+      runs: string;
+    }> = await this.dataSource.query(
+      `SELECT i.id,
+              i.title,
+              i."repoFullName"      AS repofullname,
+              i."githubIssueNumber" AS githubissuenumber,
+              i.source,
+              i."createdAt"         AS createdat,
+              r.id                  AS runid,
+              r.status,
+              r."startedAt"         AS startedat,
+              r."classificationResult"->>'severity' AS severity,
+              (SELECT e.score FROM eval_results e
+                WHERE e."runId" = r.id ORDER BY e."createdAt" DESC LIMIT 1)::text AS score,
+              COALESCE(rc.runs, 0)::text AS runs
+         FROM issues i
+         LEFT JOIN LATERAL (
+           SELECT run.id, run.status, run."startedAt", run."classificationResult"
+             FROM runs run
+            WHERE run."issueId" = i.id
+            ORDER BY run."startedAt" DESC
+            LIMIT 1
+         ) r ON true
+         LEFT JOIN (
+           SELECT "issueId", COUNT(*) AS runs FROM runs GROUP BY "issueId"
+         ) rc ON rc."issueId" = i.id
+        WHERE $1::text[] IS NULL OR i."repoFullName" = ANY($1)
+        ORDER BY i."createdAt" DESC`,
+      [repos],
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      repoFullName: row.repofullname,
+      githubIssueNumber: row.githubissuenumber,
+      source: row.source ?? 'github',
+      createdAt: row.createdat,
+      runs: Number(row.runs),
+      latestRun: row.runid
+        ? {
+            id: row.runid,
+            status: row.status,
+            startedAt: row.startedat,
+            severity: row.severity,
+            score: row.score === null ? null : Number(row.score),
+          }
+        : null,
+    }));
   }
 
   async getRunById(runId: string, scope?: TenantScope): Promise<Run> {
