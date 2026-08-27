@@ -180,6 +180,7 @@ describe('setRepoConnected', () => {
       nil,
       nil,
       nil,
+      nil, // runEvents — this path publishes nothing
       nil,
       nil,
       cfg({}),

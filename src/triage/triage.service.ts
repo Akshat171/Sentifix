@@ -17,6 +17,7 @@ import { AccountService } from '../billing/account.service';
 import { formatCredits } from '../billing/pricing';
 import { InsufficientCreditsError } from '../agent/triage-runner.service';
 import { LowBalanceService } from '../billing/low-balance.service';
+import { RunEventsService } from '../events/run-events.service';
 
 /**
  * Tenant scope for read/act operations. `undefined` = unrestricted (self-host or
@@ -77,6 +78,7 @@ export class TriageService {
     private readonly tenantModels: TenantModelService,
     private readonly accounts: AccountService,
     private readonly lowBalance: LowBalanceService,
+    private readonly runEvents: RunEventsService,
     private readonly dataSource: DataSource,
     config: ConfigService,
   ) {
@@ -126,6 +128,7 @@ export class TriageService {
     const run = await this.runRepo.save(
       this.runRepo.create({ issue, status: 'running', repoFullName: job.repoFullName }),
     );
+    this.runEvents.publish(job.repoFullName);
 
     try {
       // Auto-index if repo has no chunks yet — ensures RAG always has content
@@ -178,6 +181,7 @@ export class TriageService {
       run.status = 'completed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
+      this.runEvents.publish(run.repoFullName);
 
       this.logger.log(
         `Triage complete for issue ${issue.githubIssueNumber} — score: ${evalOutput.score.toFixed(2)}`,
@@ -222,6 +226,7 @@ export class TriageService {
       run.status = 'failed';
       run.completedAt = new Date();
       await this.runRepo.save(run);
+      this.runEvents.publish(run.repoFullName);
 
       if (err instanceof InsufficientCreditsError) {
         // Out of credit is a billing state, not a fault: tell the customer how to
@@ -283,6 +288,7 @@ export class TriageService {
     const run = await this.runRepo.save(
       this.runRepo.create({ issue, status: 'pending', repoFullName: issue.repoFullName }),
     );
+    this.runEvents.publish(issue.repoFullName);
 
     // Orchestrate in background — same flow as the queue consumer
     this.orchestrate({

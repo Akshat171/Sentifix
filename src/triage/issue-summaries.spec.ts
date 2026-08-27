@@ -44,6 +44,7 @@ function svc(rows: Array<Record<string, unknown>>, scopeRepos: string[] = []) {
     nil,
     nil,
     nil,
+    nil, // runEvents — this path publishes nothing
     { query } as unknown as DataSource,
     cfg({}),
   );

@@ -17,6 +17,7 @@ import { PublicApiController } from './public-api.controller';
 import { TriageController } from './triage.controller';
 import { TriageService } from './triage.service';
 import { BillingModule } from '../billing/billing.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { BillingModule } from '../billing/billing.module';
     IndexingModule,
     QuotaModule,
     BillingModule,
+    EventsModule,
   ],
   providers: [TriageService, ResolveService],
   controllers: [TriageController, PublicApiController, QueueConsumer],

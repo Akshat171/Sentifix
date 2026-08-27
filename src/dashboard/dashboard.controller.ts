@@ -136,6 +136,10 @@ let failures = 0;
 const FAST_MS = 5000;
 const IDLE_MS = 60000;
 const MAX_BACKOFF_MS = 300000;
+// With the stream connected the poll is only a safety net, for the case where
+// the connection is alive but silently delivering nothing.
+const STREAMING_MS = 300000;
+let streaming = false;
 
 function sev(s) {
   const colors = {
@@ -187,6 +191,7 @@ async function loadIssues(opts) {
 /** Back off on repeated failure; otherwise follow whether work is in flight. */
 function nextDelay() {
   if (failures > 0) return Math.min(FAST_MS * Math.pow(2, failures), MAX_BACKOFF_MS);
+  if (streaming) return STREAMING_MS;
   return inFlight() ? FAST_MS : IDLE_MS;
 }
 
@@ -373,6 +378,38 @@ async function retriageIssue(issueId, btn) {
 // loadIssues() schedules the next poll itself, so there is no fixed interval to
 // drift out of step with how long a request actually takes.
 loadIssues();
+
+/**
+ * Live updates.
+ *
+ * The stream only ever says "something changed" — the refresh is the same fetch
+ * the poll makes, so there is one render path whether the update arrived by
+ * push or by poll. EventSource reconnects on its own, and the poll underneath
+ * means a browser or proxy that kills the stream costs freshness, not function.
+ */
+(function connectStream() {
+  if (typeof EventSource === 'undefined') return;
+
+  const es = new EventSource('/events/runs');
+
+  es.addEventListener('open', function () {
+    streaming = true;
+    schedule();
+  });
+
+  es.addEventListener('message', function (e) {
+    let payload;
+    try { payload = JSON.parse(e.data); } catch { return; }
+    // The ping only proves the connection is alive; it is not a change.
+    if (payload && payload.type === 'runs-changed') loadIssues({ quiet: true });
+  });
+
+  es.addEventListener('error', function () {
+    // Fall back to the faster polling cadence until EventSource reconnects.
+    streaming = false;
+    schedule();
+  });
+})();
 </script>`,
     });
 

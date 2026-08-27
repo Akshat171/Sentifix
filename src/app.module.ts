@@ -9,6 +9,7 @@ import { IndexingModule } from './indexing/indexing.module';
 import { AgentModule } from './agent/agent.module';
 import { EvalModule } from './eval/eval.module';
 import { GithubModule } from './github/github.module';
+import { EventsModule } from './events/events.module';
 import { TriageModule } from './triage/triage.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { QueueModule } from './queue/queue.module';
@@ -32,6 +33,7 @@ import { AdminModule } from './admin/admin.module';
     EvalModule,
     GithubModule,
     TriageModule,
+    EventsModule,
     IngestionModule,
     QueueModule,
     DashboardModule,
