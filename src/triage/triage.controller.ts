@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiKeyGuard } from '../auth/api-key.guard';
 import { SessionGuard } from '../auth/session.guard';
 import type { SessionPayload } from '../auth/session.service';
@@ -57,6 +57,25 @@ export class TriageController {
       body?.connected === true,
       this.scope(req),
     );
+  }
+
+  /**
+   * Delete an issue and its runs. Irreversible, and scoped to the caller's own
+   * installations like every other write here.
+   */
+  @Delete('issues/:issueId')
+  deleteIssue(@Param('issueId') issueId: string, @Req() req: { session?: SessionPayload }) {
+    return this.triage.deleteIssue(issueId, this.scope(req));
+  }
+
+  /** Delete a repo's whole footprint: issues, runs, evals and indexed code. */
+  @Delete('repos/:owner/:repo')
+  deleteRepo(
+    @Param('owner') owner: string,
+    @Param('repo') repo: string,
+    @Req() req: { session?: SessionPayload },
+  ) {
+    return this.triage.deleteRepo(`${owner}/${repo}`, this.scope(req));
   }
 
   @Post('runs/:runId/resolve')

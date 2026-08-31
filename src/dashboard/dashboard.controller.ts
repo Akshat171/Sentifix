@@ -86,6 +86,10 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 .retriage-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono)}
 .retriage-btn:hover{border-color:var(--accent);color:var(--ink)}
 .retriage-btn:disabled{opacity:.5;cursor:not-allowed}
+.del-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono)}
+.del-btn:hover{border-color:var(--del);color:var(--del);background:var(--del-wash)}
+.del-btn.armed{background:var(--del);border-color:var(--del);color:#fff;font-weight:600}
+.del-btn:disabled{opacity:.5;cursor:not-allowed}
 .pr-link{display:inline-block;background:var(--accent-wash);border:1px solid var(--accent);color:var(--accent-text);padding:9px 16px;border-radius:8px;font-size:.875rem;font-weight:600;text-decoration:none;margin-top:14px}
 .resolve-msg{font-size:.75rem;color:var(--muted);margin-top:8px;font-family:var(--mono);line-height:1.6}
 .no-issues{color:var(--muted);font-size:.8125rem;padding:24px;text-align:center}
@@ -225,6 +229,7 @@ function renderList() {
       <div class="issue-sub" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
         <span>\${issue.repoFullName || ''} · #\${issue.githubIssueNumber} · \${run?.status || 'pending'}</span>
         <button class="retriage-btn" onclick="event.stopPropagation();retriageIssue('\${issue.id}',this)" title="Re-run triage with latest indexed code">Re-run</button>
+        <button class="del-btn" onclick="event.stopPropagation();deleteIssue('\${issue.id}',this)" title="Delete this issue and its runs">Delete</button>
       </div>
     </div>\`;
   }).join('');
@@ -351,6 +356,36 @@ async function resolveRun(runId, btn, repoFullName) {
   } catch(e) {
     btn.disabled = false;
     btn.textContent = 'Approve — create branch and open PR';
+  }
+}
+
+// Two-step rather than a dialog: one issue is a smaller loss than a whole repo,
+// but it still takes its runs and scores with it and cannot be undone.
+async function deleteIssue(issueId, btn) {
+  if (!btn.classList.contains('armed')) {
+    btn.classList.add('armed');
+    btn.textContent = 'Delete?';
+    setTimeout(() => { btn.classList.remove('armed'); btn.textContent = 'Delete'; }, 4000);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    const r = await fetch(API + '/triage/issues/' + issueId, { method: 'DELETE' });
+    if (!r.ok) throw new Error('failed');
+    // The open detail panel may be showing what was just deleted.
+    if (selectedId === issueId) {
+      selectedId = null;
+      document.getElementById('main-panel').innerHTML =
+        '<div class="empty"><p>Issue deleted.</p></div>';
+    }
+    lastPayload = '';
+    await loadIssues({ quiet: true });
+  } catch {
+    btn.disabled = false;
+    btn.classList.remove('armed');
+    btn.textContent = 'Delete';
   }
 }
 

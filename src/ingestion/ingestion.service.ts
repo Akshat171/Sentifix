@@ -259,10 +259,14 @@ export class IngestionService {
     }
   }
 
-  /** Whether the customer has switched this repo off from the dashboard. */
+  /**
+   * Whether the customer has switched this repo off, or deleted it outright.
+   * Both must refuse work: a deleted repo whose App is still installed would
+   * otherwise come back to life on its next issue.
+   */
   private async isDisconnected(repoFullName: string): Promise<boolean> {
     const row = await this.installRepoMap.findOne({ where: { repoFullName } });
-    return row?.disconnectedAt != null;
+    return row?.disconnectedAt != null || row?.deletedAt != null;
   }
 
   /**
@@ -275,7 +279,12 @@ export class IngestionService {
   private async mapRepos(installationId: number, repos: string[]): Promise<void> {
     if (!repos.length) return;
     await this.installRepoMap.upsert(
-      repos.map((repoFullName) => ({ installationId, repoFullName, disconnectedAt: null })),
+      repos.map((repoFullName) => ({
+        installationId,
+        repoFullName,
+        disconnectedAt: null,
+        deletedAt: null,
+      })),
       ['repoFullName'],
     );
   }

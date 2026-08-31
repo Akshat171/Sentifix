@@ -141,9 +141,9 @@ describe('a connected repo', () => {
   });
 });
 
-describe('re-adding a repo on GitHub clears the disconnect', () => {
-  it('writes disconnectedAt: null when repos are added to an installation', async () => {
-    const h = harness({ repoFullName: REPO, disconnectedAt: new Date() });
+describe('re-adding a repo on GitHub is the undo', () => {
+  it('clears both the disconnect and the delete stamp', async () => {
+    const h = harness({ repoFullName: REPO, disconnectedAt: new Date(), deletedAt: new Date() });
 
     await h.service.handleInstallationReposEvent({
       action: 'added',
@@ -151,10 +151,23 @@ describe('re-adding a repo on GitHub clears the disconnect', () => {
       repositories_added: [{ id: 9001, full_name: REPO }],
     });
 
+    // Adding the repo on GitHub is unambiguous intent to use it again; leaving
+    // either stamp set would make a freshly added repo look silently broken.
     expect(h.installRepoMap.upsert).toHaveBeenCalledWith(
-      [{ installationId: 7, repoFullName: REPO, disconnectedAt: null }],
+      [{ installationId: 7, repoFullName: REPO, disconnectedAt: null, deletedAt: null }],
       ['repoFullName'],
     );
+  });
+});
+
+describe('a deleted repo', () => {
+  it('refuses new issues even though the App is still installed', async () => {
+    const h = harness({ repoFullName: REPO, disconnectedAt: null, deletedAt: new Date() });
+
+    await h.service.handleIssueEvent(issueEvent());
+
+    expect(h.producer.enqueueTriageJob).not.toHaveBeenCalled();
+    expect(h.github.postPlaceholderComment).not.toHaveBeenCalled();
   });
 });
 

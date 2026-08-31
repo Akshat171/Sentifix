@@ -44,6 +44,14 @@ export interface IssueSummary {
   } | null;
 }
 
+/** What a delete removed, so the UI can say it plainly. */
+export interface DeletionSummary {
+  issues: number;
+  runs: number;
+  evals: number;
+  chunks: number;
+}
+
 export interface RepoOverview {
   repoFullName: string;
   issues: number;
@@ -409,7 +417,9 @@ export class TriageService {
   /** Repo full-names visible to the given tenant scope. */
   private async reposForScope(scope: number[]): Promise<string[]> {
     if (!scope.length) return [];
-    const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
+    const rows = await this.installRepoMap.find({
+      where: { installationId: In(scope), deletedAt: IsNull() },
+    });
     return rows.map((r) => r.repoFullName);
   }
 
@@ -493,6 +503,97 @@ export class TriageService {
   }
 
   /**
+   * Delete an issue and everything produced for it.
+   *
+   * Runs and eval results go with it — they are meaningless without the issue.
+   * Ledger entries do not: they reference a run by id but carry no foreign key,
+   * so the financial record survives its operational cause, which is what an
+   * audit trail is for.
+   */
+  async deleteIssue(issueId: string, scope?: TenantScope): Promise<DeletionSummary> {
+    const issue = await this.issueRepo.findOne({ where: { id: issueId } });
+    if (!issue) throw new NotFoundException(`Issue ${issueId} not found`);
+    await this.assertRepoInScope(issue.repoFullName ?? '', scope);
+
+    return this.dataSource.transaction(async (tx) => {
+      const [{ runs, evals }]: Array<{ runs: string; evals: string }> = await tx.query(
+        `SELECT (SELECT count(*) FROM runs WHERE "issueId" = $1)::text AS runs,
+                (SELECT count(*) FROM eval_results e
+                   JOIN runs r ON r.id = e."runId" WHERE r."issueId" = $1)::text AS evals`,
+        [issueId],
+      );
+
+      await tx.query(
+        `DELETE FROM eval_results WHERE "runId" IN (SELECT id FROM runs WHERE "issueId" = $1)`,
+        [issueId],
+      );
+      await tx.query(`DELETE FROM runs WHERE "issueId" = $1`, [issueId]);
+      await tx.query(`DELETE FROM issues WHERE id = $1`, [issueId]);
+
+      this.logger.log(`Deleted issue ${issueId} (${runs} run(s), ${evals} eval(s))`);
+      return { issues: 1, runs: Number(runs), evals: Number(evals), chunks: 0 };
+    });
+  }
+
+  /**
+   * Delete a repo's entire footprint: issues, runs, evals and indexed code.
+   *
+   * Deliberately does not touch GitHub — the App stays installed and no comment
+   * or branch is removed. This is "forget what you know about my repo", not
+   * "undo what you did on it", because the second is not ours to undo.
+   */
+  async deleteRepo(repoFullName: string, scope?: TenantScope): Promise<DeletionSummary> {
+    await this.assertRepoInScope(repoFullName, scope);
+
+    return this.dataSource.transaction(async (tx) => {
+      const [counts]: Array<{ issues: string; runs: string; evals: string; chunks: string }> =
+        await tx.query(
+          `SELECT (SELECT count(*) FROM issues WHERE "repoFullName" = $1)::text AS issues,
+                  (SELECT count(*) FROM runs  WHERE "repoFullName" = $1
+                     OR "issueId" IN (SELECT id FROM issues WHERE "repoFullName" = $1))::text AS runs,
+                  (SELECT count(*) FROM eval_results e JOIN runs r ON r.id = e."runId"
+                    WHERE r."repoFullName" = $1
+                      OR r."issueId" IN (SELECT id FROM issues WHERE "repoFullName" = $1))::text AS evals,
+                  (SELECT count(*) FROM code_chunks WHERE repo_full_name = $1)::text AS chunks`,
+          [repoFullName],
+        );
+
+      // Runs are matched on both columns: repoFullName is denormalised onto runs
+      // but is nullable, so an older run is only reachable through its issue.
+      await tx.query(
+        `DELETE FROM eval_results WHERE "runId" IN (
+           SELECT id FROM runs WHERE "repoFullName" = $1
+             OR "issueId" IN (SELECT id FROM issues WHERE "repoFullName" = $1))`,
+        [repoFullName],
+      );
+      await tx.query(
+        `DELETE FROM runs WHERE "repoFullName" = $1
+           OR "issueId" IN (SELECT id FROM issues WHERE "repoFullName" = $1)`,
+        [repoFullName],
+      );
+      await tx.query(`DELETE FROM issues WHERE "repoFullName" = $1`, [repoFullName]);
+      await tx.query(`DELETE FROM code_chunks WHERE repo_full_name = $1`, [repoFullName]);
+      await tx.query(
+        `UPDATE installation_repositories
+            SET "deletedAt" = now(), "disconnectedAt" = COALESCE("disconnectedAt", now())
+          WHERE "repoFullName" = $1`,
+        [repoFullName],
+      );
+
+      this.logger.log(
+        `Deleted ${repoFullName}: ${counts.issues} issue(s), ${counts.runs} run(s), ` +
+          `${counts.evals} eval(s), ${counts.chunks} indexed chunk(s)`,
+      );
+      return {
+        issues: Number(counts.issues),
+        runs: Number(counts.runs),
+        evals: Number(counts.evals),
+        chunks: Number(counts.chunks),
+      };
+    });
+  }
+
+  /**
    * Stop acting on a repo without uninstalling the GitHub App.
    *
    * The mapping row is kept rather than deleted, for two reasons: the repo stays
@@ -534,15 +635,21 @@ export class TriageService {
     if (scope === undefined) {
       const rows: Array<{ repo: string }> = await this.dataSource.query(
         `SELECT DISTINCT repo FROM (
-           SELECT "repoFullName" AS repo FROM installation_repositories
+           SELECT "repoFullName" AS repo FROM installation_repositories WHERE "deletedAt" IS NULL
            UNION SELECT "repoFullName" FROM issues WHERE "repoFullName" IS NOT NULL
            UNION SELECT "repoFullName" FROM runs   WHERE "repoFullName" IS NOT NULL
-         ) t WHERE repo IS NOT NULL`,
+         ) t
+          WHERE repo IS NOT NULL
+            AND repo NOT IN (
+              SELECT "repoFullName" FROM installation_repositories WHERE "deletedAt" IS NOT NULL
+            )`,
       );
       return rows.map((r) => r.repo);
     }
     if (scope.length === 0) return [];
-    const rows = await this.installRepoMap.find({ where: { installationId: In(scope) } });
+    const rows = await this.installRepoMap.find({
+      where: { installationId: In(scope), deletedAt: IsNull() },
+    });
     return [...new Set(rows.map((r) => r.repoFullName))];
   }
 

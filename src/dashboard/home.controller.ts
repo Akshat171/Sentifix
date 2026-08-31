@@ -93,6 +93,16 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
 .conn.on{color:var(--accent-text);border-color:var(--accent)}
 .conn.on:hover{background:var(--accent-wash);color:var(--accent-text)}
 .conn:disabled{opacity:.5;cursor:default}
+.del{background:none;border:1px solid var(--line);color:var(--muted);font:inherit;font-size:.75rem;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.del:hover{border-color:var(--del);color:var(--del);background:var(--del-wash)}
+.confirm{display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.confirm .warn{font-size:.75rem;color:var(--del);text-align:right;line-height:1.45;max-width:280px}
+.confirm .row{display:flex;gap:6px}
+.confirm input{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:.75rem;color:var(--ink);width:210px}
+.confirm input:focus{outline:none;border-color:var(--del)}
+.confirm .go{background:var(--del);border:1px solid var(--del);color:#fff;font:inherit;font-size:.75rem;font-weight:600;padding:6px 11px;border-radius:7px;cursor:pointer}
+.confirm .go:disabled{opacity:.4;cursor:default}
+.confirm .cancel{background:none;border:1px solid var(--line);color:var(--muted);font:inherit;font-size:.75rem;padding:6px 11px;border-radius:7px;cursor:pointer}
 .repo .name{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.9375rem;font-weight:600;letter-spacing:-.01em}
 .repo .name svg{opacity:.5;flex:none}
 .repo .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:.8125rem;color:var(--muted)}
@@ -217,6 +227,8 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
               '<small>score</small></div>' +
             '<button class="conn' + (off ? ' on' : '') + '" data-repo="' + esc(r.repoFullName) + '"' +
               ' data-connect="' + (off ? '1' : '0') + '">' + (off ? 'Reconnect' : 'Disconnect') + '</button>' +
+            '<button class="del" data-repo="' + esc(r.repoFullName) + '"' +
+              ' data-issues="' + r.issues + '" data-runs="' + r.runs + '" data-chunks="' + r.chunks + '">Delete</button>' +
           '</div></div>';
       }).join('') + '</div>';
 
@@ -265,6 +277,77 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
             btn.textContent = connect ? 'Reconnect' : 'Disconnect';
             sub.textContent = e.message;
           });
+      });
+    });
+
+    // Deleting a repo throws away every issue, run and indexed chunk for it, and
+    // nothing brings them back. A two-step click is too easy to do by accident at
+    // that cost, so this asks for the repo's name — the same bar GitHub sets for
+    // deleting a repository, for the same reason.
+    Array.prototype.forEach.call(root.querySelectorAll('.del'), function (btn) {
+      btn.addEventListener('click', function () {
+        var repo = btn.dataset.repo;
+        var right = btn.parentNode;
+        var restore = right.innerHTML;
+
+        var counts = [];
+        if (+btn.dataset.issues) counts.push(btn.dataset.issues + ' issue' + (+btn.dataset.issues === 1 ? '' : 's'));
+        if (+btn.dataset.runs) counts.push(btn.dataset.runs + ' run' + (+btn.dataset.runs === 1 ? '' : 's'));
+        if (+btn.dataset.chunks) counts.push(btn.dataset.chunks + ' indexed chunk' + (+btn.dataset.chunks === 1 ? '' : 's'));
+
+        right.innerHTML =
+          '<div class="confirm">' +
+            '<div class="warn">Permanently deletes ' +
+              (counts.length ? counts.join(', ') : 'this repository\\'s history') +
+              '. Your code and GitHub comments are untouched.</div>' +
+            '<div class="row">' +
+              '<input type="text" placeholder="' + esc(repo) + '" aria-label="Type the repository name to confirm">' +
+              '<button class="go" disabled>Delete</button>' +
+              '<button class="cancel">Cancel</button>' +
+            '</div>' +
+          '</div>';
+
+        var input = right.querySelector('input');
+        var go = right.querySelector('.go');
+        var cancel = right.querySelector('.cancel');
+        input.focus();
+
+        input.addEventListener('input', function () {
+          go.disabled = input.value.trim() !== repo;
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !go.disabled) go.click();
+          if (e.key === 'Escape') cancel.click();
+        });
+        cancel.addEventListener('click', function () {
+          right.innerHTML = restore;
+          wireRows();
+        });
+
+        go.addEventListener('click', function () {
+          var parts = repo.split('/');
+          go.disabled = true;
+          go.textContent = 'Deleting…';
+
+          fetch('/triage/repos/' + encodeURIComponent(parts[0]) + '/' + encodeURIComponent(parts[1]), {
+            method: 'DELETE',
+          })
+            .then(function (res) {
+              if (!res.ok) throw new Error('Could not delete ' + repo);
+              return res.json();
+            })
+            .then(function (d) {
+              sub.textContent =
+                'Deleted ' + repo + ' — ' + d.issues + ' issue(s), ' + d.runs + ' run(s), ' +
+                d.chunks + ' chunk(s) removed';
+              return load();
+            })
+            .catch(function (e) {
+              right.innerHTML = restore;
+              wireRows();
+              sub.textContent = e.message;
+            });
+        });
       });
     });
   }

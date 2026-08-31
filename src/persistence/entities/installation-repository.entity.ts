@@ -28,6 +28,18 @@ export class InstallationRepository {
   @Column({ type: 'timestamptz', nullable: true })
   disconnectedAt: Date | null;
 
+  /**
+   * Set when the customer deletes the repo and its history from the dashboard.
+   *
+   * A tombstone rather than a deleted row: the GitHub App may still be installed,
+   * and an unmapped repo is one that ingestion happily triages and bills as its
+   * own tenant — so removing the row would resurrect the repo on its next issue.
+   * The row stays, hidden from every list, and keeps refusing work. Re-adding the
+   * repo on GitHub clears it, which is the one unambiguous "I want this back".
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  deletedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }
