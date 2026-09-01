@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { BRAND_MARK, page } from '../ui/theme';
+import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
 
 /**
  * The customer's usage and plan screen.
@@ -41,10 +41,7 @@ export class UsageController {
         title: 'Sentifix — usage & plan',
         description: 'Credit balance, triages remaining, and plan selection.',
         head: `<style>
-header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:12px}
-header .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.875rem;font-weight:600}
-.user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
-.user a{color:var(--accent-text)}
+${NAV_CSS}
 main{max-width:840px;margin-inline:auto;padding:34px 24px 80px}
 .eyebrow{font-family:var(--mono);font-size:.6875rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);margin-bottom:10px}
 .hero-num{font-family:var(--mono);font-size:3.1rem;font-weight:600;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
@@ -68,10 +65,7 @@ main{max-width:840px;margin-inline:auto;padding:34px 24px 80px}
 .skel{color:var(--muted);font-family:var(--mono);font-size:.8125rem}
 </style>`,
         body: `
-<header>
-  <span class="brand">${BRAND_MARK} Sentifix</span>
-  ${userBadge}
-</header>
+${dashboardHeader({ active: 'usage', userBadge })}
 <main>
   <p class="eyebrow">Usage &amp; plan</p>
   <div id="root"><p class="skel">Loading your plan…</p></div>

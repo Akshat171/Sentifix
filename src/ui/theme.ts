@@ -139,6 +139,70 @@ code,pre,.mono{font-family:var(--mono)}
 }
 `;
 
+/** The four dashboard destinations, in the order they appear in the nav. */
+const DASHBOARD_NAV = [
+  { href: '/dashboard', label: 'Repositories', key: 'repos' },
+  { href: '/dashboard/issues', label: 'Issues', key: 'issues' },
+  { href: '/dashboard/usage', label: 'Usage', key: 'usage' },
+  { href: '/dashboard/keys', label: 'API keys', key: 'keys' },
+] as const;
+
+export type DashboardSection = (typeof DASHBOARD_NAV)[number]['key'];
+
+/**
+ * Styles for the shared dashboard header.
+ *
+ * Lives here rather than in each page's <style> block because it was copied
+ * into two pages and then diverged: the issue explorer and the usage page grew
+ * their own headers with no nav at all, so those two screens were dead ends you
+ * could only leave with the back button.
+ */
+export const NAV_CSS = `
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0}
+header .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.875rem;font-weight:600;text-decoration:none;color:inherit}
+header nav{display:flex;gap:4px;margin-left:8px}
+header nav a{font-size:.8125rem;padding:5px 11px;border-radius:7px;text-decoration:none;color:var(--muted);white-space:nowrap}
+header nav a:hover{background:var(--sunk);color:var(--ink)}
+header nav a[aria-current]{background:var(--accent-wash);color:var(--accent-text);font-weight:600}
+header .user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
+header .user a{color:var(--accent-text)}
+header .actions{display:flex;gap:8px;align-items:center}
+header .user + .actions{margin-left:12px}
+header .actions:only-of-type{margin-left:auto}
+@media (max-width:640px){
+  header nav{margin-left:0;order:3;width:100%}
+  header nav a{padding:5px 8px}
+}
+`;
+
+/**
+ * The dashboard header: brand, section nav, then who you are signed in as.
+ *
+ * `active` marks the current section with aria-current, which is what the nav
+ * styles key off — so the highlight and the accessible state can never disagree.
+ */
+export function dashboardHeader(o: {
+  active: DashboardSection;
+  /** Pre-rendered user badge, or '' when auth is off. */
+  userBadge?: string;
+  /** Page-specific controls, e.g. the issue explorer's Refresh button. */
+  actions?: string;
+}): string {
+  const links = DASHBOARD_NAV.map(
+    (n) => `<a href="${n.href}"${n.key === o.active ? ' aria-current="page"' : ''}>${n.label}</a>`,
+  ).join('\n    ');
+
+  return `
+<header>
+  <a class="brand" href="/">${BRAND_MARK} Sentifix</a>
+  <nav>
+    ${links}
+  </nav>
+  ${o.userBadge ?? ''}
+  ${o.actions ? `<div class="actions">${o.actions}</div>` : ''}
+</header>`;
+}
+
 export function page(o: PageOptions): string {
   return `<!DOCTYPE html>
 <html lang="en">

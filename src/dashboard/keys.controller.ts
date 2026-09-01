@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { BRAND_MARK, page } from '../ui/theme';
+import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
 
 /**
  * Self-serve API keys.
@@ -44,14 +44,7 @@ export class KeysController {
         title: 'Sentifix — API keys',
         description: 'Create and revoke the keys that authenticate your calls to the Sentifix API.',
         head: `<style>
-header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-header .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.875rem;font-weight:600}
-nav{display:flex;gap:4px;margin-left:8px}
-nav a{font-size:.8125rem;padding:5px 11px;border-radius:7px;text-decoration:none;color:var(--muted)}
-nav a:hover{background:var(--sunk);color:var(--ink)}
-nav a[aria-current]{background:var(--accent-wash);color:var(--accent-text);font-weight:600}
-.user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
-.user a{color:var(--accent-text)}
+${NAV_CSS}
 main{max-width:860px;margin-inline:auto;padding:30px 24px 80px}
 .head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .head h1{font-size:1.5rem;letter-spacing:-.02em;margin:0}
@@ -98,16 +91,7 @@ pre .c{color:var(--muted)}
 .err{color:var(--del);font-size:.875rem}
 </style>`,
         body: `
-<header>
-  <span class="brand">${BRAND_MARK} Sentifix</span>
-  <nav>
-    <a href="/dashboard">Repositories</a>
-    <a href="/dashboard/issues">Issues</a>
-    <a href="/dashboard/usage">Usage</a>
-    <a href="/dashboard/keys" aria-current="page">API keys</a>
-  </nav>
-  ${userBadge}
-</header>
+${dashboardHeader({ active: 'keys', userBadge })}
 <main>
   <div class="head">
     <div>

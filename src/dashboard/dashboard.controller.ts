@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { BRAND_MARK, page } from '../ui/theme';
+import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
 
 @Controller('dashboard')
 export class DashboardController {
@@ -31,13 +31,8 @@ export class DashboardController {
       title: 'Sentifix — issues',
       fullHeight: true,
       head: `<style>
-header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-header .brand{font-size:.9375rem}
-header .tagline{font-family:var(--mono);font-size:.6875rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
-.user a{color:var(--accent-text)}
-.refresh-btn{margin-left:auto;background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8125rem;font-family:var(--sans)}
-.user + .refresh-btn{margin-left:12px}
+${NAV_CSS}
+.refresh-btn{background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8125rem;font-family:var(--sans)}
 .refresh-btn:hover{border-color:var(--accent)}
 
 .layout{display:flex;flex:1;overflow:hidden}
@@ -83,10 +78,10 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 .resolve-btn{background:var(--accent);border:1px solid transparent;color:#fff;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:.875rem;font-weight:600;font-family:var(--sans);margin-top:14px}
 .resolve-btn:hover{background:var(--accent-text)}
 .resolve-btn:disabled{background:var(--sunk);color:var(--muted);cursor:not-allowed;border-color:var(--line)}
-.retriage-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono)}
+.retriage-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono);white-space:nowrap}
 .retriage-btn:hover{border-color:var(--accent);color:var(--ink)}
 .retriage-btn:disabled{opacity:.5;cursor:not-allowed}
-.del-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono)}
+.del-btn{background:var(--surface);border:1px solid var(--line);color:var(--muted);padding:4px 9px;border-radius:6px;cursor:pointer;font-size:.75rem;font-family:var(--mono);white-space:nowrap}
 .del-btn:hover{border-color:var(--del);color:var(--del);background:var(--del-wash)}
 .del-btn.armed{background:var(--del);border-color:var(--del);color:#fff;font-weight:600}
 .del-btn:disabled{opacity:.5;cursor:not-allowed}
@@ -107,12 +102,11 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 }
 </style>`,
       body: `
-  <header>
-    <a class="brand" href="/">${BRAND_MARK}Sentifix</a>
-    <span class="tagline">Triage</span>
-    ${userBadge}
-    <button class="refresh-btn" onclick="loadIssues()">Refresh</button>
-  </header>
+  ${dashboardHeader({
+    active: 'issues',
+    userBadge,
+    actions: '<button class="refresh-btn" onclick="loadIssues()">Refresh</button>',
+  })}
   <div class="layout">
     <div class="sidebar">
       <div class="sidebar-header">Triaged issues</div>
@@ -227,7 +221,7 @@ function renderList() {
       </div>
       <div class="issue-title">\${issue.title}</div>
       <div class="issue-sub" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span>\${issue.repoFullName || ''} · #\${issue.githubIssueNumber} · \${run?.status || 'pending'}</span>
+        <span style="min-width:0;overflow:hidden;text-overflow:ellipsis">\${issue.repoFullName || ''} · #\${issue.githubIssueNumber} · \${run?.status || 'pending'}</span>
         <button class="retriage-btn" onclick="event.stopPropagation();retriageIssue('\${issue.id}',this)" title="Re-run triage with latest indexed code">Re-run</button>
         <button class="del-btn" onclick="event.stopPropagation();deleteIssue('\${issue.id}',this)" title="Delete this issue and its runs">Delete</button>
       </div>
