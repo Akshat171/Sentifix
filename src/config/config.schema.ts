@@ -66,6 +66,12 @@ export const configSchema = Joi.object({
   BEDROCK_MAX_TOKENS: Joi.number().default(16000),
   OPENAI_API_KEY: Joi.string().required(),
   OPENAI_EMBEDDING_MODEL: Joi.string().default('text-embedding-3-small'),
+
+  // Per-request bound on model calls. Must stay well under RabbitMQ's 30-minute
+  // consumer_timeout: a call still hanging when that fires gets the whole triage
+  // job redelivered, which is how the 30-minute loop starts.
+  LLM_TIMEOUT_MS: Joi.number().min(1000).default(90_000),
+  LLM_MAX_RETRIES: Joi.number().min(0).max(5).default(1),
   // Precision stage: after retrieval casts a wide net, an LLM reranker scores each
   // candidate chunk for relevance and keeps only the top RERANK_TOP_N for the fix prompt.
   RERANK_ENABLED: Joi.boolean().default(true),

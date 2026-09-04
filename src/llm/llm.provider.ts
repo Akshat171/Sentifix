@@ -33,7 +33,24 @@ export class LlmProvider {
   readonly embeddingModel: string;
 
   constructor(private readonly config: ConfigService) {
-    this.client = new OpenAI({ apiKey: config.get<string>('OPENAI_API_KEY') });
+    // Bounded deliberately. The SDK defaults to a 10-minute timeout and 2
+    // retries, so one wedged call can hold a triage for half an hour — past
+    // RabbitMQ's 30-minute consumer_timeout, at which point the broker decides
+    // the consumer is dead and redelivers the job. That is the loop that
+    // re-triaged one issue 47 times, and acking cannot prevent it because the
+    // handler never reaches its `finally` while the call is still hanging.
+    //
+    // A triage that cannot answer in 90s will not answer better in ten minutes;
+    // failing fast leaves the run marked failed and the message acked, inside
+    // the window.
+    const timeout = Number(config.get<number>('LLM_TIMEOUT_MS') ?? 90_000);
+    const maxRetries = Number(config.get<number>('LLM_MAX_RETRIES') ?? 1);
+
+    this.client = new OpenAI({
+      apiKey: config.get<string>('OPENAI_API_KEY'),
+      timeout,
+      maxRetries,
+    });
     this.embeddingModel = config.get<string>('OPENAI_EMBEDDING_MODEL') ?? 'text-embedding-3-small';
 
     this.chatModel = config.get<string>('DEFAULT_CHAT_MODEL') ?? 'gpt-4o-mini';
