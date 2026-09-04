@@ -20,6 +20,7 @@ import { LowBalanceService } from './low-balance.service';
 import { StripeService } from './stripe.service';
 import { CostEstimator } from './cost-estimator';
 import { LedgerService } from './ledger.service';
+import { SpendService } from './spend.service';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { LedgerService } from './ledger.service';
     ApiKeyService,
     EntitlementService,
     CustomerKeyGuard,
+    SpendService,
   ],
   // The key services and the guard are exported because TriageModule's public
   // API controller is guarded by them.
@@ -59,6 +61,7 @@ import { LedgerService } from './ledger.service';
     ApiKeyService,
     EntitlementService,
     CustomerKeyGuard,
+    SpendService,
   ],
 })
 export class BillingModule {}

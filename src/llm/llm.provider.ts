@@ -129,6 +129,7 @@ export class LlmProvider {
       model: this.embeddingModel,
       input: text,
     });
+    this.meterEmbedding(response.usage?.prompt_tokens);
     return response.data[0].embedding;
   }
 
@@ -138,6 +139,28 @@ export class LlmProvider {
       model: this.embeddingModel,
       input: texts,
     });
+    this.meterEmbedding(response.usage?.prompt_tokens);
     return response.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+  }
+
+  /**
+   * Embeddings cost money and were previously invisible: neither embed path
+   * recorded usage, so indexing spend appeared on the vendor's bill and nowhere
+   * in ours. Recording it here closes the gap for embeddings raised inside a
+   * triage (the auto-index before a run).
+   *
+   * Standalone indexing — an install webhook or a push — runs outside any usage
+   * context, so this is a no-op there and that spend is still unaccounted. The
+   * cost dashboard says so rather than quietly under-reporting; metering it
+   * properly means deciding whether customers are charged for indexing, which is
+   * a pricing question rather than a plumbing one.
+   */
+  private meterEmbedding(promptTokens?: number): void {
+    if (!promptTokens) return;
+    recordUsage({
+      modelKey: this.embeddingModel,
+      inputTokens: promptTokens,
+      outputTokens: 0,
+    });
   }
 }

@@ -14,6 +14,7 @@ import { costMicro, formatCredits, MICRO_PER_CREDIT } from '../billing/pricing';
 import { selectableModels } from '../llm/model-catalog';
 import { LinkProvider, TenantModelService } from '../llm/tenant-model.service';
 import { InsightsService } from '../billing/insights.service';
+import { SpendService } from '../billing/spend.service';
 import { AdminGuard } from './admin.guard';
 import { AccessService } from '../auth/access.service';
 
@@ -44,6 +45,7 @@ export class AdminController {
     private readonly accounts: AccountService,
     private readonly ledger: LedgerService,
     private readonly insights: InsightsService,
+    private readonly spend: SpendService,
     private readonly access: AccessService,
   ) {}
 
@@ -91,6 +93,12 @@ export class AdminController {
   }
 
   /** Per-tenant runs, escalation rate, margin and a tier recommendation. */
+  /** Vendor cost, credits charged and margin — what the OpenAI dashboard shows, plus the half it does not. */
+  @Get('spend')
+  async spendReport() {
+    return this.spend.report();
+  }
+
   @Get('insights')
   async insightsView() {
     const tenants = await this.insights.tenantStats();

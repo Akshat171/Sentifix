@@ -26,6 +26,13 @@ export interface CatalogEntry {
   modelId: string;
   tier: ModelTier;
   /**
+   * Chat unless stated. Embedding models live here too — they cost real money
+   * and unpriced spend cannot appear on the cost dashboard — but they bill only
+   * on input, so anything asserting "output costs more than input" must know
+   * which kind it is looking at.
+   */
+  kind?: 'chat' | 'embedding';
+  /**
    * Vendor list price in USD per million tokens — the raw cost, NOT the sale
    * price. Your margin is the CREDIT_MARKUP config, applied once at billing time,
    * so these stay directly checkable against the vendor's own pricing page.
@@ -100,6 +107,22 @@ export const MODEL_CATALOG: readonly CatalogEntry[] = [
     usdPerMTokIn: 2.5,
     usdPerMTokOut: 10.0,
     pricedOn: '2026-08-18',
+    selectable: false,
+  },
+  // Not a chat model, and never selectable as one. It is in the catalog because
+  // every indexing pass spends real money on it, and spend that is not priced
+  // here is spend that cannot appear on the cost dashboard — which is how a
+  // vendor bill ends up larger than anything the product can account for.
+  {
+    key: 'text-embedding-3-small',
+    label: 'Embeddings (text-embedding-3-small)',
+    vendor: 'openai',
+    modelId: 'text-embedding-3-small',
+    tier: 'economy',
+    kind: 'embedding',
+    usdPerMTokIn: 0.02,
+    usdPerMTokOut: 0,
+    pricedOn: '2026-09-04',
     selectable: false,
   },
   // Anthropic, reached through Amazon Bedrock. Requires an AWS account with

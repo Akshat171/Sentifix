@@ -5,14 +5,30 @@ describe('catalog pricing data', () => {
   it('prices every model, or billing silently charges nothing', () => {
     for (const m of MODEL_CATALOG) {
       expect(m.usdPerMTokIn).toBeGreaterThan(0);
-      expect(m.usdPerMTokOut).toBeGreaterThan(0);
       expect(m.pricedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      // Embeddings return vectors rather than completions, so they bill on input
+      // alone — but the output rate must be an explicit zero, not absent, or the
+      // cost report would read a missing number as free.
+      if (m.kind === 'embedding') expect(m.usdPerMTokOut).toBe(0);
+      else expect(m.usdPerMTokOut).toBeGreaterThan(0);
     }
   });
 
-  it('charges more for output than input on every model, as vendors do', () => {
+  it('charges more for output than input on every chat model, as vendors do', () => {
     for (const m of MODEL_CATALOG) {
+      if (m.kind === 'embedding') continue; // no output tokens to charge for
       expect(m.usdPerMTokOut).toBeGreaterThan(m.usdPerMTokIn);
+    }
+  });
+
+  it('prices the embedding model, so indexing spend can be accounted for', () => {
+    // It was absent from the catalog entirely, which is why every indexing pass
+    // was invisible to billing while still costing real money.
+    const embedders = MODEL_CATALOG.filter((m) => m.kind === 'embedding');
+    expect(embedders.length).toBeGreaterThan(0);
+    for (const m of embedders) {
+      expect(m.selectable).toBe(false); // never offered as a chat choice
+      expect(m.usdPerMTokIn).toBeGreaterThan(0);
     }
   });
 
