@@ -5,7 +5,15 @@ import { In, Repository } from 'typeorm';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
 import { InstallationRepository } from '../persistence/entities/installation-repository.entity';
-import { DASHBOARD_SHELL_END, NAV_CSS, SHELL_JS, dashboardShell, page } from '../ui/theme';
+import {
+  DASHBOARD_SHELL_END,
+  GITHUB_ICON,
+  NAV_CSS,
+  SHELL_JS,
+  SLACK_ICON,
+  dashboardShell,
+  page,
+} from '../ui/theme';
 
 /**
  * The screen you land on: how much work Sentifix did, how good it was, and
@@ -72,6 +80,21 @@ export class OverviewController {
         fullHeight: true,
         head: `<style>
 ${NAV_CSS}
+.integrations{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:11px;margin-bottom:22px}
+.intg{display:flex;align-items:center;gap:13px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+/* A missing integration is the one thing here worth interrupting for, so it
+   takes the accent border and the filled button. A connected one goes quiet and
+   stops competing with the numbers below it. */
+.intg.off{border-color:var(--accent);background:var(--accent-wash)}
+.intg .ico{width:36px;height:36px;border-radius:9px;background:var(--sunk);display:flex;align-items:center;justify-content:center;flex:none}
+.intg.off .ico{background:var(--surface)}
+.intg .what{min-width:0}
+.intg .nm{font-family:var(--mono);font-size:.875rem;font-weight:600;display:flex;align-items:center;gap:7px}
+.intg .st{font-size:.8125rem;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.intg .go{margin-left:auto;flex:none}
+.idot{width:7px;height:7px;border-radius:50%;flex:none}
+.idot.on{background:var(--add)}
+.idot.no{background:var(--sev-medium)}
 main{padding:26px 24px 70px}
 .inner{max-width:1180px;margin-inline:auto}
 
@@ -409,13 +432,74 @@ ${DASHBOARD_SHELL_END}
       '</div>';
 
     root.innerHTML =
+      '<div id="integrations"></div>' +
       '<div class="greet"><div>' +
         '<h1>' + greeting() + '</h1>' +
         '<div class="date">' + new Date().toLocaleDateString(undefined, {
           weekday: 'long', month: 'short', day: 'numeric',
         }) + '</div>' +
       '</div></div>' + kpis + '<div class="row2">' + volume + load + '</div>' + bottom;
+
+    // render() owns #root, so anything already drawn into the placeholder is
+    // gone by now — ask for it again rather than racing the two fetches.
+    fetch('/dashboard/integrations')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(renderIntegrations)
+      .catch(function () {});
   }
+
+  function intgCard(o) {
+    return '<div class="intg' + (o.off ? ' off' : '') + '">' +
+      '<span class="ico">' + o.icon + '</span>' +
+      '<div class="what">' +
+        '<div class="nm"><span class="idot ' + (o.off ? 'no' : 'on') + '"></span>' + o.name + '</div>' +
+        '<div class="st">' + esc(o.state) + '</div>' +
+      '</div>' +
+      '<a class="btn btn-sm go ' + (o.primary ? 'btn-primary' : 'btn-outline') + '" href="' + o.href + '">' +
+        esc(o.cta) + '</a>' +
+    '</div>';
+  }
+
+  function renderIntegrations(d) {
+    var el = document.getElementById('integrations');
+    if (!el || !d) return;
+
+    var cards = [intgCard({
+      off: !d.github.connected,
+      icon: ${JSON.stringify(GITHUB_ICON)},
+      name: 'GitHub',
+      state: d.github.connected
+        ? d.github.repos + ' repositor' + (d.github.repos === 1 ? 'y' : 'ies') + ' connected'
+        : 'No repositories connected yet',
+      cta: d.github.connected ? 'Manage' : 'Install on GitHub',
+      href: '/setup',
+      primary: !d.github.connected,
+    })];
+
+    // Hidden when the deployment has no Slack credentials: offering a button
+    // that cannot work is worse than not mentioning Slack at all.
+    if (d.slack.available) {
+      var names = d.slack.workspaces.map(function (w) { return w.teamName || w.teamId; });
+      cards.push(intgCard({
+        off: !d.slack.connected,
+        icon: ${JSON.stringify(SLACK_ICON)},
+        name: 'Slack',
+        state: d.slack.connected ? names.join(', ') : 'Report bugs with @sentifix in any channel',
+        cta: d.slack.connected ? 'Add another' : 'Add to Slack',
+        href: '/slack/install',
+        primary: !d.slack.connected,
+      }));
+    }
+
+    el.innerHTML = '<div class="integrations">' + cards.join('') + '</div>';
+  }
+
+  // Loaded independently of the KPI data: a slow or failing integrations lookup
+  // must not keep the dashboard itself off the screen.
+  fetch('/dashboard/integrations')
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(renderIntegrations)
+    .catch(function () {});
 
   Promise.all([
     fetch('/triage/overview'),
