@@ -5,7 +5,14 @@ import { In, Repository } from 'typeorm';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
 import { InstallationRepository } from '../persistence/entities/installation-repository.entity';
-import { GITHUB_ICON, NAV_CSS, dashboardHeader, page } from '../ui/theme';
+import {
+  DASHBOARD_SHELL_END,
+  GITHUB_ICON,
+  NAV_CSS,
+  SHELL_JS,
+  dashboardShell,
+  page,
+} from '../ui/theme';
 
 /**
  * The page a returning customer lands on.
@@ -33,7 +40,7 @@ export class HomeController {
     this.authEnabled = config.get<boolean>('DASHBOARD_AUTH') === true;
   }
 
-  @Get()
+  @Get('repos')
   async serve(@Req() req: HttpRequest, @Res() reply: HttpReply): Promise<void> {
     let userBadge = '';
 
@@ -62,13 +69,14 @@ export class HomeController {
       page({
         title: 'Sentifix — your repositories',
         description: 'Connected repositories, triage activity and fix quality at a glance.',
+        fullHeight: true,
         head: `<style>
 ${NAV_CSS}
-main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
+main{padding:26px 24px 70px}
+.inner{max-width:1040px;margin-inline:auto}
 .head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .head h1{font-size:1.5rem;letter-spacing:-.02em;margin:0}
 .head .sub{color:var(--muted);font-size:.875rem;margin-top:4px}
-.head .act{margin-left:auto}
 .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:24px}
 .totals div{background:var(--surface);padding:13px 15px}
 .totals dt{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -117,17 +125,25 @@ main{max-width:1000px;margin-inline:auto;padding:30px 24px 80px}
 .err{color:var(--del);font-size:.875rem}
 </style>`,
         body: `
-${dashboardHeader({ active: 'repos', userBadge })}
+${dashboardShell({
+  active: 'repos',
+  crumb: 'Repositories',
+  userBadge,
+  actions: '<a class="btn btn-outline btn-sm" href="/setup">Connect another</a>',
+})}
 <main>
-  <div class="head">
-    <div>
-      <h1>Your repositories</h1>
-      <div class="sub" id="sub">Loading…</div>
+  <div class="inner">
+    <div class="head">
+      <div>
+        <h1>Your repositories</h1>
+        <div class="sub" id="sub">Loading…</div>
+      </div>
     </div>
-    <div class="act"><a class="btn btn-outline btn-sm" href="/setup">Connect another</a></div>
+    <div id="root"><p class="skel">Loading your repositories…</p></div>
   </div>
-  <div id="root"><p class="skel">Loading your repositories…</p></div>
 </main>
+${DASHBOARD_SHELL_END}
+<script>${SHELL_JS}</script>
 <script>
 (function () {
   var root = document.getElementById('root');

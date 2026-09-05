@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
+import { DASHBOARD_SHELL_END, NAV_CSS, SHELL_JS, dashboardShell, page } from '../ui/theme';
 
 /**
  * Self-serve API keys.
@@ -43,9 +43,11 @@ export class KeysController {
       page({
         title: 'Sentifix — API keys',
         description: 'Create and revoke the keys that authenticate your calls to the Sentifix API.',
+        fullHeight: true,
         head: `<style>
 ${NAV_CSS}
-main{max-width:860px;margin-inline:auto;padding:30px 24px 80px}
+main{padding:26px 24px 70px}
+.inner{max-width:860px;margin-inline:auto}
 .head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 .head h1{font-size:1.5rem;letter-spacing:-.02em;margin:0}
 .head .sub{color:var(--muted);font-size:.875rem;margin-top:4px}
@@ -91,8 +93,9 @@ pre .c{color:var(--muted)}
 .err{color:var(--del);font-size:.875rem}
 </style>`,
         body: `
-${dashboardHeader({ active: 'keys', userBadge })}
+${dashboardShell({ active: 'keys', crumb: 'API keys', userBadge })}
 <main>
+  <div class="inner">
   <div class="head">
     <div>
       <h1>API keys</h1>
@@ -123,7 +126,10 @@ curl <span id="origin2">https://sentifix.dev</span>/v1/repos -H "x-api-key: <spa
 curl -X POST <span id="origin3">https://sentifix.dev</span>/v1/issues/<span class="c">&lt;issueId&gt;</span>/retriage \\
   -H "x-api-key: <span class="c">sfx_live_…</span>"</pre>
   </div>
+  </div>
 </main>
+${DASHBOARD_SHELL_END}
+<script>${SHELL_JS}</script>
 <script>
 (function () {
   var root = document.getElementById('root');

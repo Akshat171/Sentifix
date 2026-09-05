@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
+import { DASHBOARD_SHELL_END, NAV_CSS, SHELL_JS, dashboardShell, page } from '../ui/theme';
 
 /**
  * The customer's usage and plan screen.
@@ -40,9 +40,11 @@ export class UsageController {
       page({
         title: 'Sentifix — usage & plan',
         description: 'Credit balance, triages remaining, and plan selection.',
+        fullHeight: true,
         head: `<style>
 ${NAV_CSS}
-main{max-width:840px;margin-inline:auto;padding:34px 24px 80px}
+main{padding:30px 24px 70px}
+.inner{max-width:840px;margin-inline:auto}
 .eyebrow{font-family:var(--mono);font-size:.6875rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);margin-bottom:10px}
 .hero-num{font-family:var(--mono);font-size:3.1rem;font-weight:600;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
 .hero-sub{color:var(--muted);font-size:.95rem;margin-top:8px}
@@ -65,11 +67,15 @@ main{max-width:840px;margin-inline:auto;padding:34px 24px 80px}
 .skel{color:var(--muted);font-family:var(--mono);font-size:.8125rem}
 </style>`,
         body: `
-${dashboardHeader({ active: 'usage', userBadge })}
+${dashboardShell({ active: 'usage', crumb: 'Usage', userBadge })}
 <main>
-  <p class="eyebrow">Usage &amp; plan</p>
-  <div id="root"><p class="skel">Loading your plan…</p></div>
+  <div class="inner">
+    <p class="eyebrow">Usage &amp; plan</p>
+    <div id="root"><p class="skel">Loading your plan…</p></div>
+  </div>
 </main>
+${DASHBOARD_SHELL_END}
+<script>${SHELL_JS}</script>
 <script>
 (function () {
   var root = document.getElementById('root');

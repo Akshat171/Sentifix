@@ -2,7 +2,7 @@ import { Controller, Get, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { HttpReply, HttpRequest } from '../auth/http.types';
 import { SessionService } from '../auth/session.service';
-import { NAV_CSS, dashboardHeader, page } from '../ui/theme';
+import { DASHBOARD_SHELL_END, NAV_CSS, SHELL_JS, dashboardShell, page } from '../ui/theme';
 
 @Controller('dashboard')
 export class DashboardController {
@@ -35,9 +35,20 @@ ${NAV_CSS}
 .refresh-btn{background:var(--surface);border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:.8125rem;font-family:var(--sans)}
 .refresh-btn:hover{border-color:var(--accent)}
 
-.layout{display:flex;flex:1;overflow:hidden}
-.sidebar{width:380px;border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0;background:var(--surface)}
-.sidebar-header{padding:14px 16px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.6875rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
+/* This page is its own two-pane app, so main is the frame rather than the
+   scroll container the other sections get from the shell. */
+main{display:flex;overflow:hidden;padding:0}
+.layout{display:flex;flex:1;overflow:hidden;min-width:0}
+.sidebar{width:380px;border-right:1px solid var(--line);overflow-y:auto;flex-shrink:0;background:var(--surface);display:flex;flex-direction:column}
+.sidebar-header{padding:11px 14px;border-bottom:1px solid var(--line);flex:none}
+.sidebar-header input{
+  width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:7px;
+  padding:7px 10px;font:inherit;font-size:.8125rem;color:var(--ink);
+}
+.sidebar-header input:focus{outline:none;border-color:var(--accent)}
+.sidebar-header input::placeholder{color:var(--muted)}
+#issue-list{overflow-y:auto;flex:1}
+.no-match{padding:22px 16px;color:var(--muted);font-size:.8125rem}
 .issue-card{padding:14px 16px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;transition:background .15s}
 .issue-card:hover{background:var(--sunk)}
 .issue-card.active{background:var(--accent-wash);border-left-color:var(--accent)}
@@ -102,14 +113,19 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
 }
 </style>`,
       body: `
-  ${dashboardHeader({
-    active: 'issues',
-    userBadge,
-    actions: '<button class="refresh-btn" onclick="loadIssues()">Refresh</button>',
-  })}
+${dashboardShell({
+  active: 'issues',
+  crumb: 'Issues',
+  userBadge,
+  actions: '<button class="refresh-btn" onclick="loadIssues()">Refresh</button>',
+})}
+<main>
   <div class="layout">
     <div class="sidebar">
-      <div class="sidebar-header">Triaged issues</div>
+      <div class="sidebar-header">
+        <input id="q" type="search" placeholder="Filter issues…" autocomplete="off"
+               aria-label="Filter triaged issues">
+      </div>
       <div id="issue-list"><div class="loader"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>
     </div>
     <div class="main" id="main-panel">
@@ -119,6 +135,9 @@ p{font-size:.875rem;color:var(--muted);line-height:1.65}
       </div>
     </div>
   </div>
+</main>
+${DASHBOARD_SHELL_END}
+<script>${SHELL_JS}</script>
 
 <script>
 const API = '';
@@ -213,7 +232,9 @@ function renderList() {
     const run = issue.latestRun;
     const score = run && run.score !== null ? Math.round(run.score * 100) : null;
     const severity = run?.severity || 'unknown';
-    return \`<div class="issue-card\${issue.id === selectedId ? ' active' : ''}" onclick="selectIssue(\${i})" id="card-\${i}">
+    const find = ((issue.title || '') + ' ' + (issue.repoFullName || '') + ' #' +
+      (issue.githubIssueNumber || '') + ' ' + severity + ' ' + (run?.status || '')).toLowerCase();
+    return \`<div class="issue-card\${issue.id === selectedId ? ' active' : ''}" onclick="selectIssue(\${i})" id="card-\${i}" data-find="\${find.replace(/"/g, '&quot;')}">
       <div class="issue-meta">
         <span class="badge" style="color:\${sev(severity)}">\${severity}</span>
         \${score !== null ? \`<span class="score-pill" style="color:\${scoreColor(run.score)}">\${score}/100</span>\` : '<span class="score-pill">pending</span>'}
@@ -227,6 +248,33 @@ function renderList() {
       </div>
     </div>\`;
   }).join('');
+  filterList();
+}
+
+/**
+ * Cards are hidden rather than removed, because selectIssue() addresses issues
+ * by their index in the unfiltered array — re-rendering a filtered subset would
+ * make every click open the wrong issue.
+ */
+function filterList() {
+  const box = document.getElementById('q');
+  const list = document.getElementById('issue-list');
+  if (!box || !list) return;
+  const q = box.value.trim().toLowerCase();
+  let shown = 0;
+  list.querySelectorAll('.issue-card').forEach(card => {
+    const hit = !q || (card.dataset.find || '').indexOf(q) > -1;
+    card.hidden = !hit;
+    if (hit) shown++;
+  });
+  const old = list.querySelector('.no-match');
+  if (old) old.remove();
+  if (q && shown === 0) {
+    const p = document.createElement('div');
+    p.className = 'no-match';
+    p.textContent = 'No issues match "' + q + '".';
+    list.appendChild(p);
+  }
 }
 
 async function selectIssue(i) {
@@ -403,6 +451,8 @@ async function retriageIssue(issueId, btn) {
     btn.disabled = false;
   }
 }
+
+document.getElementById('q')?.addEventListener('input', filterList);
 
 // loadIssues() schedules the next poll itself, so there is no fixed interval to
 // drift out of step with how long a request actually takes.

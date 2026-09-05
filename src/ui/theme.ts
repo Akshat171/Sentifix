@@ -162,15 +162,60 @@ code,pre,.mono{font-family:var(--mono)}
 }
 `;
 
-/** The four dashboard destinations, in the order they appear in the nav. */
-const DASHBOARD_NAV = [
-  { href: '/dashboard', label: 'Repositories', key: 'repos' },
-  { href: '/dashboard/issues', label: 'Issues', key: 'issues' },
-  { href: '/dashboard/usage', label: 'Usage', key: 'usage' },
-  { href: '/dashboard/keys', label: 'API keys', key: 'keys' },
-] as const;
+/**
+ * Nav icons. Stroke-only 16px glyphs on a shared 16-box, so they sit on the
+ * same optical weight as the mono labels beside them and inherit currentColor
+ * with the link rather than needing a second colour rule per state.
+ */
+const NAV_ICON = {
+  home: `<path d="M2 2.5h4.2v4.2H2zM9.8 2.5H14v4.2H9.8zM2 9.3h4.2v4.2H2zM9.8 9.3H14v4.2H9.8z"/>`,
+  repo: `<path d="M3.4 2.2h9.2v11.6H4.6a1.2 1.2 0 0 1-1.2-1.2zM3.4 11.2h9.2"/>`,
+  issue: `<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/>`,
+  usage: `<path d="M2.6 13.4h10.8M4.8 13.4V8.2M8 13.4V3.4M11.2 13.4v-3.6"/>`,
+  key: `<circle cx="5.4" cy="8" r="2.9"/><path d="M8.3 8h5.3M11.6 8v2.4"/>`,
+} as const;
 
-export type DashboardSection = (typeof DASHBOARD_NAV)[number]['key'];
+/**
+ * The dashboard destinations, grouped the way the sidebar shows them.
+ *
+ * Grouping is what makes a sidebar readable once it passes about four items:
+ * "Repositories" and "Issues" are things you operate on, "Usage" is something
+ * you read, and "API keys" is account plumbing. Flattening them back into one
+ * list would make the sidebar longer than the old top nav for no gain.
+ */
+export type DashboardSection = 'home' | 'repos' | 'issues' | 'usage' | 'keys';
+
+interface NavItem {
+  href: string;
+  label: string;
+  key: DashboardSection;
+  icon: keyof typeof NAV_ICON;
+}
+
+/* Annotated rather than `as const`: the literal tuple types that produces make
+   every group a different type, so flatMap over the groups widens to {} and
+   the icon lookup stops type-checking. */
+const DASHBOARD_NAV: ReadonlyArray<{ group: string; items: readonly NavItem[] }> = [
+  {
+    group: 'Overview',
+    items: [{ href: '/dashboard', label: 'Dashboard', key: 'home', icon: 'home' }],
+  },
+  {
+    group: 'Operations',
+    items: [
+      { href: '/dashboard/repos', label: 'Repositories', key: 'repos', icon: 'repo' },
+      { href: '/dashboard/issues', label: 'Issues', key: 'issues', icon: 'issue' },
+    ],
+  },
+  {
+    group: 'Insights',
+    items: [{ href: '/dashboard/usage', label: 'Usage', key: 'usage', icon: 'usage' }],
+  },
+  {
+    group: 'Account',
+    items: [{ href: '/dashboard/keys', label: 'API keys', key: 'keys', icon: 'key' }],
+  },
+];
 
 /**
  * Styles for the shared dashboard header.
@@ -181,62 +226,230 @@ export type DashboardSection = (typeof DASHBOARD_NAV)[number]['key'];
  * could only leave with the back button.
  */
 export const NAV_CSS = `
-header{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 22px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0}
-header .brand{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:.875rem;font-weight:600;text-decoration:none;color:inherit}
-header nav{display:flex;gap:4px;margin-left:8px}
-header nav a{font-size:.8125rem;padding:5px 11px;border-radius:7px;text-decoration:none;color:var(--muted);white-space:nowrap}
-header nav a:hover{background:var(--sunk);color:var(--ink)}
-header nav a[aria-current]{background:var(--accent-wash);color:var(--accent-text);font-weight:600}
-header .user{margin-left:auto;font-size:.8125rem;color:var(--muted)}
-header .user a{color:var(--accent-text)}
-header .actions{display:flex;gap:8px;align-items:center}
-header .user + .actions{margin-left:12px}
-header .actions:only-of-type{margin-left:auto}
+/* ── App shell: fixed sidebar, scrolling pane ────────────────────────── */
+/* body.app is already a 100vh flex column with overflow hidden, so the shell
+   takes the remaining row and only <main> scrolls. min-height/min-width 0 on
+   the flex children is what stops a wide table inside main from pushing the
+   sidebar off screen instead of scrolling itself. */
+.shell{display:flex;flex:1;min-height:0}
+.pane{display:flex;flex-direction:column;flex:1;min-width:0}
+main{overflow-y:auto;flex:1;min-height:0}
+
+.side{
+  width:216px;flex:none;display:flex;flex-direction:column;
+  background:var(--surface);border-right:1px solid var(--line);
+  transition:width .18s cubic-bezier(.2,.7,.3,1);overflow:hidden;
+}
+.side-top{display:flex;align-items:center;gap:9px;height:53px;padding:0 14px;flex:none}
+.side-top .brand{font-size:.9375rem;overflow:hidden;white-space:nowrap}
+.side-toggle{
+  margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;
+  padding:5px;border-radius:6px;line-height:0;flex:none;
+}
+.side-toggle:hover{background:var(--sunk);color:var(--ink)}
+.side-toggle svg{transition:transform .18s cubic-bezier(.2,.7,.3,1)}
+
+.side nav{display:flex;flex-direction:column;gap:1px;padding:6px 10px;overflow-y:auto;flex:1}
+.side-group{
+  font-family:var(--mono);font-size:.625rem;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);padding:14px 8px 5px;white-space:nowrap;
+}
+.side nav a{
+  display:flex;align-items:center;gap:10px;position:relative;
+  font-size:.8125rem;padding:7px 8px;border-radius:7px;
+  text-decoration:none;color:var(--muted);white-space:nowrap;
+}
+.side nav a svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.side nav a:hover{background:var(--sunk);color:var(--ink)}
+.side nav a[aria-current]{background:var(--accent-wash);color:var(--accent-text);font-weight:600}
+.side-foot{
+  border-top:1px solid var(--line);padding:11px 14px;font-size:.75rem;
+  color:var(--muted);white-space:nowrap;overflow:hidden;flex:none;
+}
+.side-foot a{color:var(--accent-text)}
+
+/* Collapsed: icons only. The labels are hidden rather than removed so the
+   sidebar can animate its width instead of snapping, and the group headings
+   collapse to a hairline so the icon groups stay visually separated. */
+.shell.tight .side{width:57px}
+.shell.tight .side-top .brand span,
+.shell.tight .side nav a span,
+.shell.tight .side-foot span{display:none}
+.shell.tight .side-group{
+  font-size:0;padding:9px 8px 4px;
+}
+.shell.tight .side-group::after{
+  content:"";display:block;height:1px;background:var(--line);
+}
+.shell.tight .side-toggle svg{transform:rotate(180deg)}
+.shell.tight .side-top{padding-inline:11px}
+.shell.tight .side-top .brand{margin-inline:auto}
+.shell.tight .side-toggle{position:absolute;left:-9999px}
+.shell.tight .side:hover .side-toggle{position:static;margin-left:0}
+.shell.tight .side:hover .brand{display:none}
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+.topbar{
+  display:flex;align-items:center;gap:12px;height:53px;padding:0 20px;flex:none;
+  border-bottom:1px solid var(--line);background:var(--surface);
+}
+.crumb{display:flex;align-items:center;gap:8px;font-size:.875rem;font-weight:600;letter-spacing:-.01em}
+.crumb svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+.synced{display:none;font-size:.75rem;color:var(--muted);align-items:center;gap:6px}
+.synced::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--add);flex:none}
+@media (min-width:720px){.synced{display:flex}}
+.topsearch{
+  margin-left:auto;display:none;align-items:center;gap:8px;
+  background:var(--sunk);border:1px solid var(--line);border-radius:8px;
+  padding:6px 9px;font:inherit;font-size:.8125rem;color:var(--muted);
+  cursor:pointer;min-width:236px;text-align:left;
+}
+.topsearch:hover{border-color:var(--accent)}
+.topsearch kbd{
+  margin-left:auto;font-family:var(--mono);font-size:.6875rem;
+  background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px;
+}
+@media (min-width:820px){.topsearch{display:flex}}
+.topbar .actions{display:flex;gap:8px;align-items:center}
+.topsearch + .actions{margin-left:12px}
+.topbar .actions:last-child:not(.topsearch + .actions){margin-left:auto}
+
 @media (max-width:640px){
-  header nav{margin-left:0;order:3;width:100%}
-  header nav a{padding:5px 8px}
+  .side{position:absolute;left:-9999px}
+  .shell{flex-direction:column}
 }
 
-/* Carried across a dashboard navigation rather than repainted. The header is
-   byte-identical on all four pages, so naming it holds it perfectly still
-   while the content underneath cross-fades. The pill gets its own name, and
-   because exactly one link is ever aria-current the name stays unique within
-   each document — which is what lets the browser read the two as the same
-   box and slide it from one section to the next instead of blinking it. */
-header{view-transition-name:sfx-header}
-header nav a[aria-current]{view-transition-name:sfx-navpill}
+/* ── Carried across a dashboard navigation rather than repainted ─────── */
+/* The sidebar and top bar are identical on every dashboard page, so naming
+   them holds both perfectly still while only the pane underneath cross-fades.
+   The pill gets its own name, and because exactly one link is ever
+   aria-current the name stays unique within each document — which is what
+   lets the browser read the two as the same box and slide it between
+   sections instead of blinking it. */
+.side{view-transition-name:sfx-sidebar}
+.topbar{view-transition-name:sfx-topbar}
+.side nav a[aria-current]{view-transition-name:sfx-navpill}
 /* Short, because the label inside the pill is stretched by the morph and a
    long one makes that legible. */
 ::view-transition-old(sfx-navpill),::view-transition-new(sfx-navpill){animation-duration:.2s}
 `;
 
 /**
- * The dashboard header: brand, section nav, then who you are signed in as.
+ * The dashboard shell: grouped sidebar, top bar, and the scrolling pane your
+ * page content goes into.
  *
- * `active` marks the current section with aria-current, which is what the nav
- * styles key off — so the highlight and the accessible state can never disagree.
+ * `active` marks the current section with aria-current, which is what both the
+ * nav styles and the view-transition pill key off — so the highlight, the
+ * accessible state and the thing that animates can never disagree.
+ *
+ * Returns an unclosed pane on purpose: callers append their <main> and then
+ * `DASHBOARD_SHELL_END`. Passing the body in as a string instead would mean
+ * every caller building its markup one level deeper for no benefit.
  */
-export function dashboardHeader(o: {
+export function dashboardShell(o: {
   active: DashboardSection;
+  /** Breadcrumb label for the top bar — usually the section name. */
+  crumb: string;
   /** Pre-rendered user badge, or '' when auth is off. */
   userBadge?: string;
   /** Page-specific controls, e.g. the issue explorer's Refresh button. */
   actions?: string;
+  /** Right-hand status text, e.g. "synced 2m ago". Omitted when absent. */
+  synced?: string;
 }): string {
-  const links = DASHBOARD_NAV.map(
-    (n) => `<a href="${n.href}"${n.key === o.active ? ' aria-current="page"' : ''}>${n.label}</a>`,
-  ).join('\n    ');
+  const groups = DASHBOARD_NAV.map((g) => {
+    const links = g.items
+      .map(
+        (n) =>
+          `<a href="${n.href}"${n.key === o.active ? ' aria-current="page"' : ''}>` +
+          `<svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[n.icon]}</svg>` +
+          `<span>${n.label}</span></a>`,
+      )
+      .join('\n      ');
+    return `<p class="side-group">${g.group}</p>\n      ${links}`;
+  }).join('\n      ');
+
+  const crumbIcon =
+    DASHBOARD_NAV.flatMap((g) => g.items).find((n) => n.key === o.active)?.icon ?? 'home';
 
   return `
-<header>
-  <a class="brand" href="/">${BRAND_MARK} Sentifix</a>
-  <nav>
-    ${links}
-  </nav>
-  ${o.userBadge ?? ''}
-  ${o.actions ? `<div class="actions">${o.actions}</div>` : ''}
-</header>`;
+<div class="shell" id="shell">
+  <aside class="side">
+    <div class="side-top">
+      <a class="brand" href="/">${BRAND_MARK}<span>Sentifix</span></a>
+      <button class="side-toggle" type="button" id="side-toggle"
+              aria-label="Collapse sidebar" aria-expanded="true">
+        <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9.5 4.5 6 8l3.5 3.5M13 4.5 9.5 8l3.5 3.5"/>
+        </svg>
+      </button>
+    </div>
+    <nav aria-label="Dashboard">
+      ${groups}
+    </nav>
+    ${o.userBadge ? `<div class="side-foot">${o.userBadge}</div>` : ''}
+  </aside>
+  <div class="pane">
+    <header class="topbar">
+      <span class="crumb">
+        <svg viewBox="0 0 16 16" aria-hidden="true">${NAV_ICON[crumbIcon]}</svg>${o.crumb}
+      </span>
+      ${o.synced ? `<span class="synced">${o.synced}</span>` : ''}
+      <button class="topsearch" type="button" id="topsearch">
+        Search issues, repositories… <kbd>⌘K</kbd>
+      </button>
+      ${o.actions ? `<div class="actions">${o.actions}</div>` : ''}
+    </header>`;
 }
+
+/** Closes the pane and shell opened by `dashboardShell`. */
+export const DASHBOARD_SHELL_END = `  </div>
+</div>`;
+
+/**
+ * Sidebar collapse + the ⌘K jump, shared by every dashboard page.
+ *
+ * The collapsed state is written to localStorage and re-applied before paint
+ * by the inline read below, so navigating between sections does not flash the
+ * sidebar open and shut again on every page load.
+ */
+export const SHELL_JS = `
+(function () {
+  var shell = document.getElementById('shell');
+  var btn = document.getElementById('side-toggle');
+  if (!shell || !btn) return;
+
+  function apply(tight) {
+    shell.classList.toggle('tight', tight);
+    btn.setAttribute('aria-expanded', tight ? 'false' : 'true');
+    btn.setAttribute('aria-label', tight ? 'Expand sidebar' : 'Collapse sidebar');
+  }
+
+  var stored = null;
+  try { stored = localStorage.getItem('sfx-side'); } catch (e) { /* private mode */ }
+  apply(stored === 'tight');
+
+  btn.addEventListener('click', function () {
+    var tight = !shell.classList.contains('tight');
+    apply(tight);
+    try { localStorage.setItem('sfx-side', tight ? 'tight' : 'wide'); } catch (e) { /* ignore */ }
+  });
+
+  // The issue explorer owns the only real search box, so the shortcut takes you
+  // there rather than duplicating a second index behind a palette.
+  var search = document.getElementById('topsearch');
+  function jump() {
+    var box = document.getElementById('q');
+    if (box) { box.focus(); box.select(); return; }
+    location.href = '/dashboard/issues?focus=1';
+  }
+  if (search) search.addEventListener('click', jump);
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); jump(); }
+  });
+})();
+`;
 
 export function page(o: PageOptions): string {
   return `<!DOCTYPE html>
