@@ -21,8 +21,13 @@ export class LandingController {
       description:
         'An open-source AI agent that reads your GitHub issues, finds the root cause in your code, and replies with a proposed patch.',
       head: `<style>
-.nav{border-bottom:1px solid var(--line);background:var(--ground)}
-.nav-in{display:flex;align-items:center;gap:28px;height:66px}
+:root{--nav-h:66px}
+/* Sticky, because the page is eight bands long and the install button is the
+   only thing on it that matters. Opaque rather than blurred: --ground is
+   already the page colour, and a backdrop-filter would repaint the strip on
+   every frame of a scroll for no visible gain. */
+.nav{position:sticky;top:0;z-index:30;border-bottom:1px solid var(--line);background:var(--ground)}
+.nav-in{display:flex;align-items:center;gap:28px;height:var(--nav-h)}
 .nav-links{display:none;gap:26px;margin-left:auto}
 .nav-links a{font-size:.9375rem;color:var(--muted);text-decoration:none}
 .nav-links a:hover{color:var(--ink)}
@@ -126,6 +131,76 @@ export class LandingController {
   .flow-diff div{opacity:1}
   .flow-bar i{width:97.5%}
 }
+
+/* ── The same pipeline, scrubbed by the scroll rather than by a timer ──── */
+/* The loop above is honest but impatient: it decides when you see each stage,
+   so a reader who arrives mid-cycle waits up to twelve seconds for the diff
+   and cannot go back to the stage they missed. Where scroll-driven animations
+   exist the card is pinned instead, and the five stages are dealt out against
+   scroll position — the reader sets the pace and can scrub either way. It is
+   also free at rest: a scroll timeline only advances while the page moves,
+   where the 15s loop repaints forever whether or not it is on screen.
+
+   The timer is the fallback rather than a second code path. Everything below
+   lives inside @supports, so a browser without scroll timelines never sees it
+   and keeps the loop it already had.
+
+   The per-stage phase shift is re-expressed in the markup as animation-range,
+   because animation-delay has no meaning on a scroll timeline — there is no
+   time to delay by, only distance. */
+@supports (animation-timeline:view()){
+  @media (prefers-reduced-motion:no-preference){
+    /* The pin lasts the track's height minus one viewport, which is exactly
+       the span the 'contain' ranges in the markup are measured against. */
+    .flow-track{height:320vh;view-timeline-name:--flow}
+    .flow-pin{position:sticky;top:var(--nav-h);height:calc(100vh - var(--nav-h));display:flex;align-items:center}
+    .flow{width:100%;margin-bottom:0}
+
+    .flow-rail li,.flow-stage,.flow-type,.flow-diff div,.flow-bar i{
+      animation-timeline:--flow;
+      animation-duration:auto;
+      animation-timing-function:linear;
+      animation-iteration-count:1;
+      animation-fill-mode:both;
+    }
+    .flow-rail .arw{animation-name:none}
+    .flow-rail li{animation-name:flowNodeScrub}
+    .flow-stage{animation-name:flowStageScrub}
+    .flow-stage:last-child{animation-name:flowStageScrubLast}
+    .flow-type{animation-name:flowTypeScrub}
+    .flow-diff div{animation-name:flowLineScrub}
+    .flow-bar i{animation-name:flowBarScrub}
+
+    /* Held at the 0% frame before its range and the 100% frame after it, so a
+       node reads pending, then running, then done — and stays done. */
+    @keyframes flowNodeScrub{
+      0%{color:var(--muted);border-color:var(--line);background:var(--ground)}
+      4%,96%{color:var(--accent-text);border-color:var(--accent);background:var(--accent-wash)}
+      100%{color:var(--add);border-color:var(--add);background:var(--ground)}
+    }
+    /* visibility is keyframed at both ends rather than left to its default
+       discrete flip. The five stages are stacked, and without this the four
+       that are merely transparent still hold selectable text over the one
+       being read. */
+    @keyframes flowStageScrub{
+      0%{opacity:0;visibility:hidden;transform:translateY(8px)}
+      2%{opacity:0;visibility:visible;transform:translateY(8px)}
+      14%,86%{opacity:1;visibility:visible;transform:none}
+      98%{opacity:0;visibility:visible;transform:translateY(-6px)}
+      100%{opacity:0;visibility:hidden;transform:translateY(-6px)}
+    }
+    /* The last stage has nothing to hand over to, so it stays up while the
+       card scrolls away instead of blanking just before it leaves. */
+    @keyframes flowStageScrubLast{
+      0%{opacity:0;visibility:hidden;transform:translateY(8px)}
+      2%{opacity:0;visibility:visible;transform:translateY(8px)}
+      14%,100%{opacity:1;visibility:visible;transform:none}
+    }
+    @keyframes flowTypeScrub{0%,14%{width:0}80%,100%{width:100%}}
+    @keyframes flowLineScrub{0%{opacity:0;transform:translateX(-7px)}100%{opacity:1;transform:none}}
+    @keyframes flowBarScrub{0%,20%{width:0}90%,100%{width:97.5%}}
+  }
+}
 /* Video player. Click-to-play with a poster: the launch film is 72s and nobody
    should pay for it on page load, so the <video> carries preload="none" and no
    bytes move until the poster is clicked. */
@@ -194,9 +269,31 @@ export class LandingController {
 details{border-bottom:1px solid var(--line)}
 summary{cursor:pointer;list-style:none;padding:20px 34px 20px 0;position:relative;font-weight:600;font-size:1.0625rem;letter-spacing:-.01em}
 summary::-webkit-details-marker{display:none}
-summary::after{content:"+";position:absolute;right:4px;top:18px;font-family:var(--mono);font-size:1.25rem;font-weight:400;color:var(--accent)}
-details[open] summary::after{content:"\\2212"}
+summary:hover{color:var(--accent-text)}
+/* One glyph turned, rather than + swapped for −: the content property cannot
+   be animated, and a mark that rotates is already read as "this closes
+   again". */
+summary::after{content:"+";position:absolute;right:4px;top:18px;font-family:var(--mono);font-size:1.25rem;font-weight:400;color:var(--accent);transition:transform .26s cubic-bezier(.2,.7,.3,1)}
+details[open] summary::after{transform:rotate(135deg)}
 details p{padding-bottom:22px;color:var(--muted);max-width:68ch}
+@media (prefers-reduced-motion:reduce){summary::after{transition:none}}
+
+/* An answer that slides open instead of snapping. interpolate-size is what
+   makes a height of auto animatable at all, and it only works declared on
+   an ancestor. content-visibility is transitioned with allow-discrete so the
+   panel stays rendered for the length of the collapse rather than
+   disappearing on the first frame and leaving the height to animate over
+   nothing. */
+@supports (interpolate-size:allow-keywords){
+  @media (prefers-reduced-motion:no-preference){
+    :root{interpolate-size:allow-keywords}
+    details::details-content{
+      block-size:0;overflow:hidden;
+      transition:block-size .3s cubic-bezier(.2,.7,.3,1),content-visibility .3s allow-discrete;
+    }
+    details[open]::details-content{block-size:auto}
+  }
+}
 
 .cta-band{border-top:1px solid var(--line);padding-block:clamp(60px,8vw,92px);background:var(--sunk)}
 .cta-in{display:flex;flex-direction:column;gap:22px;align-items:flex-start}
@@ -212,6 +309,37 @@ footer{border-top:1px solid var(--line);padding-block:34px}
   .rise:nth-child(2){animation-delay:.06s}
   .mock{animation:rise .6s .1s cubic-bezier(.2,.7,.3,1) backwards}
   @keyframes rise{from{opacity:0;transform:translateY(10px)}}
+}
+
+/* ── Reveal on approach ──────────────────────────────────────────────── */
+/* Keyed to each element's own position in the viewport rather than to a delay
+   counted from page load, so a band animates when it is actually reached —
+   and someone who arrives deep in the page on an anchor does not have to
+   scroll back up through a trail of things that already played to nobody.
+
+   The hidden first frame exists only inside @supports, which is the whole
+   point of the guard: a browser without view timelines never applies the
+   opacity:0, so the failure mode is "no animation" rather than "no content".
+   Unguarded, this pattern leaves Firefox staring at a blank page. */
+@supports (animation-timeline:view()){
+  @media (prefers-reduced-motion:no-preference){
+    .band-head,.steps,.faq,.cta-in,.player,
+    .cards>*,.intake>*,.quote-grid>*,.tiers>*{
+      animation:reveal linear both;
+      animation-timeline:view();
+      animation-range:entry 6% entry 44%;
+    }
+    /* Enough offset to read as a sequence, not enough to make the third card
+       feel like it is lagging. */
+    .cards>:nth-child(2),.intake>:nth-child(2),.quote-grid>:nth-child(2),.tiers>:nth-child(2){animation-range:entry 12% entry 50%}
+    .cards>:nth-child(3),.tiers>:nth-child(3){animation-range:entry 18% entry 56%}
+    @keyframes reveal{from{opacity:0;transform:translateY(14px)}}
+
+    /* The strip only needs to lift off the page once the page has moved
+       under it. */
+    .nav{animation:navLift linear both;animation-timeline:scroll();animation-range:0 96px}
+    @keyframes navLift{to{box-shadow:0 10px 26px -22px rgb(0 0 0/.65)}}
+  }
 }
 </style>`,
       body: `
@@ -419,65 +547,75 @@ footer{border-top:1px solid var(--line);padding-block:34px}
         <p class="lede">Install once. Everything after that happens on its own, in the open, in the issue thread.</p>
       </div>
 
-      <div class="flow" role="img" aria-label="The triage pipeline, animated in five stages. One: an issue is classified as high severity, a crash, in AuthService. Two: hybrid search retrieves the relevant files from the indexed repository. Three: the root cause is identified — the userId property is being accessed from an undefined object within the validateOAuthToken method. Four: a patch is proposed as a unified diff. Five: the patch is scored 0.975 by an LLM judge before anyone sees it.">
-        <ol class="flow-rail" aria-hidden="true">
-          <li style="animation-delay:0s">classify</li>
-          <li class="arw"></li>
-          <li style="animation-delay:3s">retrieve</li>
-          <li class="arw"></li>
-          <li style="animation-delay:6s">diagnose</li>
-          <li class="arw"></li>
-          <li style="animation-delay:9s">propose fix</li>
-          <li class="arw"></li>
-          <li style="animation-delay:12s">score</li>
-        </ol>
+      <!-- Two style hooks per animated element, one per timeline. The delay
+           drives the 15s loop; the range drives the pinned scroll version, and
+           whichever the browser understands is the one that runs. The first
+           stage opens in 'entry' rather than 'contain' so it has already
+           faded up by the time the card finishes pinning, instead of pinning
+           an empty box and only then filling it. -->
+      <div class="flow-track">
+        <div class="flow-pin">
+          <div class="flow" role="img" aria-label="The triage pipeline, animated in five stages. One: an issue is classified as high severity, a crash, in AuthService. Two: hybrid search retrieves the relevant files from the indexed repository. Three: the root cause is identified — the userId property is being accessed from an undefined object within the validateOAuthToken method. Four: a patch is proposed as a unified diff. Five: the patch is scored 0.975 by an LLM judge before anyone sees it.">
+            <ol class="flow-rail" aria-hidden="true">
+              <li style="animation-delay:0s;animation-range:entry 55% contain 20%">classify</li>
+              <li class="arw"></li>
+              <li style="animation-delay:3s;animation-range:contain 20% contain 40%">retrieve</li>
+              <li class="arw"></li>
+              <li style="animation-delay:6s;animation-range:contain 40% contain 60%">diagnose</li>
+              <li class="arw"></li>
+              <li style="animation-delay:9s;animation-range:contain 60% contain 80%">propose fix</li>
+              <li class="arw"></li>
+              <li style="animation-delay:12s;animation-range:contain 80% contain 100%">score</li>
+            </ol>
 
-        <div class="flow-stage-box" aria-hidden="true">
-          <figure class="flow-stage" style="animation-delay:0s">
-            <p class="flow-cap">Classified</p>
-            <div class="flow-chips">
-              <span class="flow-chip sev">severity: high</span>
-              <span class="flow-chip">crash</span>
-              <span class="flow-chip">AuthService</span>
+            <div class="flow-stage-box" aria-hidden="true">
+              <figure class="flow-stage" style="animation-delay:0s;animation-range:entry 55% contain 20%">
+                <p class="flow-cap">Classified</p>
+                <div class="flow-chips">
+                  <span class="flow-chip sev">severity: high</span>
+                  <span class="flow-chip">crash</span>
+                  <span class="flow-chip">AuthService</span>
+                </div>
+                <p class="flow-note">Every issue arrives labelled, so the queue sorts itself before anyone opens a tab.</p>
+              </figure>
+
+              <figure class="flow-stage" style="animation-delay:3s;animation-range:contain 20% contain 40%">
+                <p class="flow-cap">Retrieved from your repository</p>
+                <ul class="flow-files">
+                  <li>src/auth/auth.service.ts</li>
+                  <li>src/auth/auth.controller.ts</li>
+                  <li>src/auth/token.service.ts</li>
+                </ul>
+                <p class="flow-note">Keyword and vector search run together, then the two rankings are fused.</p>
+              </figure>
+
+              <figure class="flow-stage" style="animation-delay:6s;animation-range:contain 40% contain 60%">
+                <p class="flow-cap">Root cause</p>
+                <p class="flow-type" style="animation-delay:6s;animation-range:contain 40% contain 60%">The &apos;userId&apos; property is being accessed from an undefined object&hellip;</p>
+                <p class="flow-note">Traced back to the line that caused it, with the surrounding code as context.</p>
+              </figure>
+
+              <figure class="flow-stage" style="animation-delay:9s;animation-range:contain 60% contain 80%">
+                <p class="flow-cap">Proposed fix</p>
+                <div class="flow-diff">
+                  <div class="del" style="animation-delay:9s;animation-range:contain 61% contain 68%">- const userId = tokenDetails.userId;</div>
+                  <div class="add" style="animation-delay:9.15s;animation-range:contain 63% contain 70%">+ if (!tokenDetails.userId) {</div>
+                  <div class="add" style="animation-delay:9.3s;animation-range:contain 65% contain 72%">+   throw new Error(&apos;User ID not found in token details&apos;);</div>
+                  <div class="add" style="animation-delay:9.45s;animation-range:contain 67% contain 74%">+ }</div>
+                </div>
+                <p class="flow-note">A unified diff you can read, apply, or reject &mdash; opened as a pull request.</p>
+              </figure>
+
+              <figure class="flow-stage" style="animation-delay:12s;animation-range:contain 80% contain 100%">
+                <p class="flow-cap">Scored before you see it</p>
+                <div class="flow-score">
+                  <b>0.975</b>
+                  <span class="flow-bar"><i style="animation-delay:12s;animation-range:contain 80% contain 100%"></i></span>
+                </div>
+                <p class="flow-note">A second model grades the patch on correctness, completeness, safety and clarity. Low scores never reach the thread.</p>
+              </figure>
             </div>
-            <p class="flow-note">Every issue arrives labelled, so the queue sorts itself before anyone opens a tab.</p>
-          </figure>
-
-          <figure class="flow-stage" style="animation-delay:3s">
-            <p class="flow-cap">Retrieved from your repository</p>
-            <ul class="flow-files">
-              <li>src/auth/auth.service.ts</li>
-              <li>src/auth/auth.controller.ts</li>
-              <li>src/auth/token.service.ts</li>
-            </ul>
-            <p class="flow-note">Keyword and vector search run together, then the two rankings are fused.</p>
-          </figure>
-
-          <figure class="flow-stage" style="animation-delay:6s">
-            <p class="flow-cap">Root cause</p>
-            <p class="flow-type" style="animation-delay:6s">The &apos;userId&apos; property is being accessed from an undefined object&hellip;</p>
-            <p class="flow-note">Traced back to the line that caused it, with the surrounding code as context.</p>
-          </figure>
-
-          <figure class="flow-stage" style="animation-delay:9s">
-            <p class="flow-cap">Proposed fix</p>
-            <div class="flow-diff">
-              <div class="del" style="animation-delay:9s">- const userId = tokenDetails.userId;</div>
-              <div class="add" style="animation-delay:9.15s">+ if (!tokenDetails.userId) {</div>
-              <div class="add" style="animation-delay:9.3s">+   throw new Error(&apos;User ID not found in token details&apos;);</div>
-              <div class="add" style="animation-delay:9.45s">+ }</div>
-            </div>
-            <p class="flow-note">A unified diff you can read, apply, or reject &mdash; opened as a pull request.</p>
-          </figure>
-
-          <figure class="flow-stage" style="animation-delay:12s">
-            <p class="flow-cap">Scored before you see it</p>
-            <div class="flow-score">
-              <b>0.975</b>
-              <span class="flow-bar"><i style="animation-delay:12s"></i></span>
-            </div>
-            <p class="flow-note">A second model grades the patch on correctness, completeness, safety and clarity. Low scores never reach the thread.</p>
-          </figure>
+          </div>
         </div>
       </div>
 

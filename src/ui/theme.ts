@@ -137,6 +137,29 @@ code,pre,.mono{font-family:var(--mono)}
 @media (prefers-reduced-motion:no-preference){
   .btn-primary:active{transform:translateY(1px)}
 }
+
+/* ── Cross-document view transitions ────────────────────────────────── */
+/* Every surface here is a separately server-rendered document, so moving
+   between them is a full page load: the screen goes blank for a frame and
+   the header is torn down and rebuilt even on the dashboard, where all four
+   pages share it exactly. Opting in lets the browser cross-fade the two
+   documents instead, and anything carrying a view-transition-name is matched
+   across the navigation rather than redrawn — see NAV_CSS, which pins the
+   dashboard header and slides the active-section pill between links.
+   Browsers without the feature ignore the at-rule and navigate as before. */
+@view-transition{navigation:auto}
+::view-transition-old(root){animation:sfxRootOut .16s linear both}
+::view-transition-new(root){animation:sfxRootIn .26s cubic-bezier(.2,.7,.3,1) both}
+@keyframes sfxRootOut{to{opacity:0}}
+@keyframes sfxRootIn{from{opacity:0;transform:translateY(8px)}}
+
+/* A transition is motion nobody asked for, so honour the OS setting by
+   collapsing it to nothing — not by falling back to the blank frame. */
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){
+    animation:none !important;
+  }
+}
 `;
 
 /** The four dashboard destinations, in the order they appear in the nav. */
@@ -173,6 +196,18 @@ header .actions:only-of-type{margin-left:auto}
   header nav{margin-left:0;order:3;width:100%}
   header nav a{padding:5px 8px}
 }
+
+/* Carried across a dashboard navigation rather than repainted. The header is
+   byte-identical on all four pages, so naming it holds it perfectly still
+   while the content underneath cross-fades. The pill gets its own name, and
+   because exactly one link is ever aria-current the name stays unique within
+   each document — which is what lets the browser read the two as the same
+   box and slide it from one section to the next instead of blinking it. */
+header{view-transition-name:sfx-header}
+header nav a[aria-current]{view-transition-name:sfx-navpill}
+/* Short, because the label inside the pill is stretched by the morph and a
+   long one makes that legible. */
+::view-transition-old(sfx-navpill),::view-transition-new(sfx-navpill){animation-duration:.2s}
 `;
 
 /**
